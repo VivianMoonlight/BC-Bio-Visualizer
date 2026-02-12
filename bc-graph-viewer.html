@@ -1,0 +1,3028 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BC 资料图查看器</title>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --panel-2: #1f2430;
+      --text: #e7eaf0;
+      --muted: #9aa3b2;
+      --accent: #6ac9ff;
+      --accent-2: #ffb86b;
+      --line: #2b3240;
+      --left-w: 260px;
+      --right-w: 320px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(1200px 800px at 10% -10%, #1b2333, #0f1115);
+      color: var(--text);
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(15, 17, 21, 0.9);
+      backdrop-filter: blur(6px);
+    }
+
+    header h1 {
+      font-size: 16px;
+      margin: 0;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .button, select, input[type="text"], input[type="number"] {
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    .button {
+      cursor: pointer;
+    }
+
+    .button-accent {
+      background: linear-gradient(135deg, #ffb347, #ff3d77);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #111319;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      box-shadow: 0 6px 16px rgba(255, 77, 119, 0.25);
+    }
+
+    .button-accent:hover {
+      filter: brightness(1.05);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: var(--left-w) 8px 1fr 8px var(--right-w);
+      gap: 12px;
+      padding: 12px;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      overflow: auto;
+    }
+
+    #detail-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #detail {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+    }
+
+    #detail .field:last-of-type {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .splitter {
+      cursor: col-resize;
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0));
+      border-radius: 6px;
+      border: 1px solid var(--line);
+    }
+
+    .splitter:hover {
+      border-color: var(--accent);
+    }
+
+    #graph {
+      height: 100%;
+      min-height: 360px;
+      width: 100%;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+
+    .field {
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .field-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .collapse-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 0;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .collapse-toggle .chevron {
+      display: inline-block;
+      width: 12px;
+      text-align: center;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .field-body {
+      display: block;
+    }
+
+    .field.is-collapsed .field-body {
+      display: none;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      resize: vertical;
+      min-height: 72px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .group-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .group-members {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+      color: var(--muted);
+      max-height: 140px;
+      overflow: auto;
+      background: var(--panel-2);
+    }
+
+    .circle-filter-list {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: var(--panel-2);
+      max-height: 180px;
+      overflow: auto;
+    }
+
+    .circle-filter-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .circle-filter-item .filter-indent {
+      display: inline-block;
+    }
+
+    .circle-filter-item .filter-dot {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #2d3a52;
+      margin-right: 6px;
+    }
+
+    .tree-branch {
+      display: inline-block;
+      font-family: "Consolas", "Courier New", monospace;
+      color: #5f7aa3;
+      margin-right: 4px;
+      white-space: pre;
+    }
+
+    .circle-filter-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .circle-select-wrap {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      background: rgba(31, 36, 48, 0.6);
+    }
+
+    .circle-select-search {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .circle-select-list {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: var(--panel-2);
+      max-height: 200px;
+      overflow: auto;
+    }
+
+    .circle-select-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 4px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+
+    .circle-select-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .circle-select-item.is-focused {
+      background: rgba(106, 201, 255, 0.12);
+      color: #cfe7ff;
+      box-shadow: inset 0 0 0 1px rgba(106, 201, 255, 0.4);
+    }
+
+    .group-select-wrap {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      background: rgba(31, 36, 48, 0.6);
+    }
+
+    .group-select-search {
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    .group-select-list {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: var(--panel-2);
+      max-height: 200px;
+      overflow: auto;
+    }
+
+    .group-select-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      padding: 4px 6px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+
+    .group-select-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .group-select-item.is-focused {
+      background: rgba(255, 184, 107, 0.12);
+      color: #ffe7cf;
+      box-shadow: inset 0 0 0 1px rgba(255, 184, 107, 0.4);
+    }
+
+    .select-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .select-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .select-item.is-editing {
+      background: rgba(106, 201, 255, 0.08);
+    }
+
+    .select-item.is-focused {
+      background: rgba(255, 255, 255, 0.04);
+      box-shadow: inset 0 0 0 1px rgba(106, 201, 255, 0.25);
+    }
+
+    .select-item.is-implied .item-label {
+      color: var(--muted);
+    }
+
+    .select-item.is-drop-target {
+      outline: 1px dashed var(--accent);
+      background: rgba(106, 201, 255, 0.08);
+    }
+
+    .tree-indent {
+      display: inline-block;
+    }
+
+    .tree-node-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #2d3a52;
+      margin: 0 6px 1px 0;
+    }
+
+    .drag-handle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      margin-right: 6px;
+      color: var(--muted);
+      cursor: grab;
+      user-select: none;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .tree-root-drop {
+      border: 1px dashed var(--line);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      margin: 4px 0 8px;
+      transition: all 0.15s;
+    }
+
+    .tree-root-drop.is-drop-target {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(106, 201, 255, 0.08);
+    }
+
+    .select-item.is-creating {
+      background: rgba(106, 201, 255, 0.08);
+      border: 1px dashed var(--accent);
+      margin-top: 8px;
+    }
+
+    .select-item input[type="checkbox"],
+    .select-item input[type="radio"] {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .select-item input[type="checkbox"]:disabled,
+    .select-item input[type="radio"]:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .item-label {
+      flex: 1;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .item-input {
+      flex: 1;
+      font-size: 12px;
+      padding: 4px 8px;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      outline: none;
+    }
+
+    .item-input:focus {
+      border-color: var(--accent-2);
+    }
+
+    .item-actions {
+      display: flex;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .select-item:hover .item-actions {
+      opacity: 1;
+    }
+
+    .select-item.is-editing .item-actions,
+    .select-item.is-creating .item-actions {
+      opacity: 1;
+    }
+
+    .icon-btn {
+      width: 24px;
+      height: 24px;
+      min-width: 24px;
+      padding: 0;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      border-color: var(--line);
+    }
+
+    .icon-btn.save {
+      color: #6ac9ff;
+    }
+
+    .icon-btn.save:hover {
+      background: rgba(106, 201, 255, 0.15);
+      border-color: #6ac9ff;
+    }
+
+    .icon-btn.delete {
+      color: #ff6b6b;
+    }
+
+    .icon-btn.delete:hover {
+      background: rgba(255, 107, 107, 0.15);
+      border-color: #ff6b6b;
+    }
+
+    .create-new-btn {
+      width: 100%;
+      text-align: left;
+      color: var(--muted);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .create-new-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .create-new-btn::before {
+      content: "+";
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 4px 0;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .muted { color: var(--muted); }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #23304a;
+      color: #a9c7ff;
+      font-size: 11px;
+      margin-left: 6px;
+    }
+
+    .detail-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 6px 0;
+    }
+
+    .detail-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: transparent;
+      border: none;
+      padding: 4px 2px 8px;
+      border-radius: 0;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+      font-size: 15px;
+      line-height: 1.65;
+      max-height: none;
+      min-height: 0;
+      overflow: auto;
+      color: #d6dbe6;
+    }
+
+    .detail-description {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .detail-description pre {
+      flex: 1 1 auto;
+    }
+
+    @media (max-width: 1200px) {
+      main {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr 280px;
+      }
+      .splitter {
+        display: none;
+      }
+      #detail-panel {
+        grid-column: 1 / -1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>BC 资料图查看器</h1>
+    <span class="pill" id="file-status">未加载文件</span>
+    <div class="toolbar">
+      <input class="button" type="file" id="fileInput" accept=".json" multiple />
+      <button class="button" id="exportMarksBtn">导出分组</button>
+      <button class="button" id="importMarksBtn">导入分组</button>
+      <button class="button button-accent" id="physicsToggleBtn" title="切换物理（空格）">开始物理</button>
+      <button class="button" id="fitBtn">适配</button>
+      <input type="file" id="importMarksInput" accept=".json" style="display:none;" />
+    </div>
+  </header>
+
+  <main>
+    <section class="panel" id="left-panel">
+      <div class="field">
+        <label for="search">搜索</label>
+        <input type="text" id="search" placeholder="姓名 / 昵称 / ID" />
+      </div>
+
+      <div class="field">
+        <div class="checkbox-row">
+          <input type="checkbox" id="displayNickname" />
+          <label for="displayNickname">显示昵称</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="titleFilter">头衔筛选</label>
+        <select id="titleFilter">
+          <option value="">全部</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>显示圈子</label>
+        <div class="checkbox-row">
+          <input type="checkbox" id="circleFilterEnabled" />
+          <label for="circleFilterEnabled">显示选中圈子</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showCircleOverlay" checked />
+          <label for="showCircleOverlay">显示圈子轮廓</label>
+        </div>
+        <div id="circleFilterList" class="circle-filter-list muted" style="font-size:12px;">
+          没有圈子
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="checkbox-row">
+          <input type="checkbox" id="showOwnership" checked />
+          <label for="showOwnership">显示主仆</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="showLovership" checked />
+          <label for="showLovership">显示恋爱</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="hideIsolated" />
+          <label for="hideIsolated">隐藏孤立</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="neighborDepth">邻接深度</label>
+        <select id="neighborDepth">
+          <option value="1" selected>1跳</option>
+          <option value="2">2跳</option>
+          <option value="3">3跳</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>统计</label>
+        <div class="stat"><span>成员总数</span><span id="statMembers">0</span></div>
+        <div class="stat"><span>主仆关系数</span><span id="statOwnership">0</span></div>
+        <div class="stat"><span>恋爱关系数</span><span id="statLovership">0</span></div>
+      </div>
+
+      <div class="field">
+        <label>筛选成员</label>
+        <div id="filteredList" class="muted" style="font-size:12px;"></div>
+      </div>
+
+      <div class="field">
+        <label>固定成员</label>
+        <div id="fixedList" class="muted" style="font-size:12px;"></div>
+      </div>
+
+      <div id="warning" class="muted" style="font-size:12px;"></div>
+
+      <div class="muted" style="font-size:12px;">
+        提示：双击节点固定可见性。按空格切换物理。拖动圈子重排树。
+      </div>
+    </section>
+
+    <div class="splitter" id="splitter-left" title="拖动调整大小"></div>
+
+    <section id="graph"></section>
+
+    <div class="splitter" id="splitter-right" title="拖动调整大小"></div>
+
+    <section class="panel" id="detail-panel">
+      <div id="detail-empty" class="muted">选择节点查看详情。</div>
+      <div id="detail" style="display:none;">
+        <h2 class="detail-title" id="detailName"></h2>
+        <div class="detail-sub" id="detailMeta"></div>
+        <div class="field">
+          <label>主仆</label>
+          <div id="detailOwnership" class="muted"></div>
+        </div>
+        <div class="field">
+          <label>恋爱</label>
+          <div id="detailLovership" class="muted"></div>
+        </div>
+        <div class="field" id="groupSection">
+          <div class="field-header">
+            <button class="collapse-toggle" id="groupToggleBtn" type="button">
+              <span class="chevron" aria-hidden="true">v</span>
+              <span>同一人分组</span>
+            </button>
+            <button class="button" id="groupClearBtn" type="button">清除</button>
+          </div>
+          <div class="field-body" id="groupSectionBody">
+            <div class="group-select-wrap">
+              <input type="text" id="groupSearch" class="group-select-search" placeholder="筛选分组" />
+              <div id="groupSelectList" class="group-select-list muted" style="font-size:12px;">
+                没有分组
+              </div>
+            </div>
+            <div class="group-members" id="groupMemberList"></div>
+          </div>
+        </div>
+
+        <div class="field" id="circleSection">
+          <div class="field-header">
+            <button class="collapse-toggle" id="circleToggleBtn" type="button">
+              <span class="chevron" aria-hidden="true">v</span>
+              <span>社交圈</span>
+            </button>
+          </div>
+          <div class="field-body" id="circleSectionBody">
+            <div class="circle-select-wrap">
+              <input type="text" id="circleSearch" class="circle-select-search" placeholder="筛选圈子" />
+              <div id="circleSelectList" class="circle-select-list muted" style="font-size:12px;">
+                没有圈子
+              </div>
+            </div>
+            <div class="group-members" id="circleMemberList"></div>
+          </div>
+        </div>
+
+        <div class="field detail-description">
+          <label>描述</label>
+          <pre id="detailDesc"></pre>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const fileStatus = document.getElementById("file-status");
+    const graphContainer = document.getElementById("graph");
+
+    const searchInput = document.getElementById("search");
+    const displayNickname = document.getElementById("displayNickname");
+    const titleFilter = document.getElementById("titleFilter");
+    const showOwnership = document.getElementById("showOwnership");
+    const showLovership = document.getElementById("showLovership");
+    const hideIsolated = document.getElementById("hideIsolated");
+    const neighborDepth = document.getElementById("neighborDepth");
+    const physicsToggleBtn = document.getElementById("physicsToggleBtn");
+    const fitBtn = document.getElementById("fitBtn");
+    const splitterLeft = document.getElementById("splitter-left");
+    const splitterRight = document.getElementById("splitter-right");
+    const exportMarksBtn = document.getElementById("exportMarksBtn");
+    const importMarksBtn = document.getElementById("importMarksBtn");
+    const importMarksInput = document.getElementById("importMarksInput");
+    const circleFilterEnabled = document.getElementById("circleFilterEnabled");
+    const showCircleOverlay = document.getElementById("showCircleOverlay");
+    const circleFilterList = document.getElementById("circleFilterList");
+
+    const statMembers = document.getElementById("statMembers");
+    const statOwnership = document.getElementById("statOwnership");
+    const statLovership = document.getElementById("statLovership");
+    const warning = document.getElementById("warning");
+    const filteredList = document.getElementById("filteredList");
+    const fixedList = document.getElementById("fixedList");
+
+    const detailEmpty = document.getElementById("detail-empty");
+    const detail = document.getElementById("detail");
+    const detailName = document.getElementById("detailName");
+    const detailMeta = document.getElementById("detailMeta");
+    const detailOwnership = document.getElementById("detailOwnership");
+    const detailLovership = document.getElementById("detailLovership");
+    const detailDesc = document.getElementById("detailDesc");
+    const groupSection = document.getElementById("groupSection");
+    const groupToggleBtn = document.getElementById("groupToggleBtn");
+    const groupSectionBody = document.getElementById("groupSectionBody");
+    const groupClearBtn = document.getElementById("groupClearBtn");
+    const groupSearch = document.getElementById("groupSearch");
+    const groupSelectList = document.getElementById("groupSelectList");
+    const groupMemberList = document.getElementById("groupMemberList");
+    const circleSection = document.getElementById("circleSection");
+    const circleToggleBtn = document.getElementById("circleToggleBtn");
+    const circleSectionBody = document.getElementById("circleSectionBody");
+    const circleSearch = document.getElementById("circleSearch");
+    const circleSelectList = document.getElementById("circleSelectList");
+    const circleMemberList = document.getElementById("circleMemberList");
+
+    let network = null;
+    let rawMembers = [];
+    let membersById = new Map();
+    let allNodes = [];
+    let allEdges = [];
+    let hasOwnershipCycle = false;
+    let lastVisibleNodeCount = 0;
+    let selectedNodeId = null;
+    let currentGraphSignature = "";
+    let renderPending = false;
+    let suppressSelectionEvent = false;
+    let nextRenderUsePhysics = false;
+    let isDraggingSplitter = false;
+    let draggingSide = null;
+    let manualPhysicsEnabled = false;
+    let suppressAutoFit = false;
+    let pendingViewAnchor = null;
+    let groupMembersByNode = new Map();
+    let circleMembersByNode = new Map();
+    let circleFilterSelected = new Set();
+    let editingGroupId = null;
+    let editingCircleId = null;
+    let creatingGroup = false;
+    let creatingCircle = false;
+    let pinnedNodes = new Set();
+    let dragCircleId = null;
+    let focusedGroupId = null;
+    let focusedCircleId = null;
+    let circleOverlayEntries = [];
+    const markDataVersion = 2;
+    const markStorageKey = "bcGraphMarks.v1";
+    let currentDataKey = "default";
+    let markData = loadMarkData();
+
+    function getMarkStorageKey() {
+      return `${markStorageKey}.${currentDataKey}`;
+    }
+
+    function buildDataKey(files) {
+      if (!files || !files.length) return "default";
+      const names = files.map(f => f.name).sort().join("|");
+      return names || "default";
+    }
+
+    function safeText(value) {
+      if (value === null || value === undefined) return "";
+      return String(value);
+    }
+
+    function getPreferredName(member) {
+      if (!member) return "未知";
+      const name = safeText(member.name) || "未知";
+      const nickname = safeText(member.nickname) || "";
+      if (displayNickname && displayNickname.checked && nickname) {
+        return nickname;
+      }
+      return name;
+    }
+
+    function getMemberLabel(memberId) {
+      const m = membersById.get(String(memberId));
+      if (!m) return `未知 (#${memberId})`;
+      return `${getPreferredName(m)} (#${memberId})`;
+    }
+
+    function normalizeMarkData(parsed) {
+      const base = {
+        version: markDataVersion,
+        nodeToGroup: {},
+        groups: {},
+        nodeToCircles: {},
+        circles: {},
+        pinnedNodes: []
+      };
+      if (!parsed || typeof parsed !== "object") return base;
+      const nodeToGroup = parsed.nodeToGroup && typeof parsed.nodeToGroup === "object" ? parsed.nodeToGroup : {};
+      const groups = parsed.groups && typeof parsed.groups === "object" ? parsed.groups : {};
+      const nodeToCircles = parsed.nodeToCircles && typeof parsed.nodeToCircles === "object" ? parsed.nodeToCircles : {};
+      const rawCircles = parsed.circles && typeof parsed.circles === "object" ? parsed.circles : {};
+      const circles = {};
+      Object.entries(rawCircles).forEach(([id, circle]) => {
+        const safeCircle = circle && typeof circle === "object" ? circle : {};
+        const children = Array.isArray(safeCircle.children)
+          ? safeCircle.children.map(child => String(child)).filter(child => child && child !== String(id))
+          : [];
+        circles[id] = { ...safeCircle, children };
+      });
+      const pinnedNodesArray = Array.isArray(parsed.pinnedNodes) ? parsed.pinnedNodes : [];
+      return { ...base, nodeToGroup, groups, nodeToCircles, circles, pinnedNodes: pinnedNodesArray };
+    }
+
+    function loadMarkData() {
+      try {
+        pinnedNodes.clear();
+        const raw = localStorage.getItem(getMarkStorageKey());
+        if (!raw) return normalizeMarkData(null);
+        const parsed = JSON.parse(raw);
+        const normalized = normalizeMarkData(parsed);
+        // Restore pinned nodes Set
+        if (Array.isArray(normalized.pinnedNodes)) {
+          normalized.pinnedNodes.forEach(id => pinnedNodes.add(String(id)));
+        }
+        return normalized;
+      } catch (err) {
+        return normalizeMarkData(null);
+      }
+    }
+
+    function saveMarkData() {
+      markData.pinnedNodes = Array.from(pinnedNodes);
+      localStorage.setItem(getMarkStorageKey(), JSON.stringify(markData));
+    }
+
+    function invalidateGraph() {
+      currentGraphSignature = "";
+      scheduleRender(true);
+    }
+
+    function captureViewAnchor(nodeId) {
+      if (!network || !nodeId) return null;
+      const pos = network.getPositions([String(nodeId)])[String(nodeId)];
+      if (!pos) return null;
+      return {
+        nodeId: String(nodeId),
+        nodePos: { x: pos.x, y: pos.y },
+        viewPos: network.getViewPosition(),
+        scale: network.getScale()
+      };
+    }
+
+    function groupColor(groupId) {
+      const hue = Math.abs(hashOffset(groupId, 97)) * 17 % 360;
+      return {
+        border: `hsl(${hue}, 70%, 55%)`,
+        background: `hsl(${hue}, 45%, 20%)`
+      };
+    }
+
+    function applyGroupStyle(nodes) {
+      return nodes.map(n => {
+        const groupId = markData.nodeToGroup[n.id];
+        if (!groupId) return n;
+        const color = groupColor(groupId);
+        return { ...n, color, size: 10, borderWidth: 2 };
+      });
+    }
+
+    function applyGroupHighlight(nodes, selectedId) {
+      if (!selectedId) return nodes;
+      const groupIds = new Set(getGroupMembers(selectedId));
+      if (groupIds.size <= 1) return nodes;
+      return nodes.map(n => {
+        if (!groupIds.has(n.id) || String(n.id) === String(selectedId)) return n;
+        const baseSize = Number.isFinite(n.size) ? n.size : 8;
+        const baseBorder = Number.isFinite(n.borderWidth) ? n.borderWidth : 1;
+        return {
+          ...n,
+          size: baseSize + 1,
+          borderWidth: baseBorder + 1,
+          shadow: { enabled: true, color: "rgba(43, 106, 122, 0.65)", size: 18, x: 0, y: 0 },
+          color: { border: "#2b6a7a", background: "#15242b" }
+        };
+      });
+    }
+
+    function applyCircleFilterHighlight(nodes) {
+      if (!circleFilterEnabled.checked || circleFilterSelected.size === 0) return nodes;
+      const expandedFilters = getExpandedCircleFilterSet(circleFilterSelected);
+      return nodes.map(n => {
+        const circles = circleMembersByNode.get(n.id) || [];
+        const isInSelected = circles.some(id => expandedFilters.has(id));
+        if (!isInSelected) return n;
+        return {
+          ...n,
+          shadow: { enabled: true, color: "rgba(89, 165, 255, 0.55)", size: 16, x: 0, y: 0 }
+        };
+      });
+    }
+
+    function applyPinnedNodes(nodes) {
+      return nodes.map(n => {
+        if (!pinnedNodes.has(n.id)) return n;
+        const baseColor = n.color || { border: "#2b3240", background: "#1f2430" };
+        return {
+          ...n,
+          borderWidth: (n.borderWidth || 1) + 2,
+          color: { ...baseColor, border: "#6ac9ff" },
+          shadow: { enabled: true, color: "rgba(106, 201, 255, 0.45)", size: 14, x: 0, y: 0 }
+        };
+      });
+    }
+
+    function buildGroupIndex(nodes) {
+      const groupToNodes = new Map();
+      const nodeToGroup = new Map();
+      nodes.forEach(n => {
+        const groupId = markData.nodeToGroup[n.id];
+        if (!groupId) return;
+        if (!groupToNodes.has(groupId)) groupToNodes.set(groupId, []);
+        groupToNodes.get(groupId).push(n.id);
+        nodeToGroup.set(n.id, groupId);
+      });
+      return { groupToNodes, nodeToGroup };
+    }
+
+    function buildCircleIndex(nodes) {
+      const circleToNodes = new Map();
+      nodes.forEach(n => {
+        const circleIds = markData.nodeToCircles[n.id];
+        if (!Array.isArray(circleIds)) return;
+        circleIds.forEach(id => {
+          if (!circleToNodes.has(id)) circleToNodes.set(id, []);
+          circleToNodes.get(id).push(n.id);
+        });
+      });
+      return { circleToNodes };
+    }
+
+    function buildCircleForest(circlesMap) {
+      const childrenById = new Map();
+      const parentById = new Map();
+      Object.entries(circlesMap).forEach(([id, circle]) => {
+        const children = Array.isArray(circle.children) ? circle.children.map(String) : [];
+        childrenById.set(String(id), children);
+      });
+
+      childrenById.forEach((children, parentId) => {
+        children.forEach(childId => {
+          if (!circlesMap[childId]) return;
+          if (!parentById.has(childId)) parentById.set(childId, parentId);
+        });
+      });
+
+      const roots = Object.keys(circlesMap)
+        .filter(id => !parentById.has(id));
+
+      const ordered = [];
+      const sortByName = (ids) => ids
+        .slice()
+        .sort((a, b) => safeText(circlesMap[a] && circlesMap[a].name || a).localeCompare(
+          safeText(circlesMap[b] && circlesMap[b].name || b)
+        ));
+
+      const visit = (id, depth) => {
+        if (!circlesMap[id]) return;
+        ordered.push({ id, depth });
+        const children = sortByName(childrenById.get(id) || []);
+        children.forEach(childId => visit(childId, depth + 1));
+      };
+
+      sortByName(roots).forEach(rootId => visit(rootId, 0));
+
+      return { ordered, parentById, childrenById };
+    }
+
+    function getCircleAncestors(circleId, parentById) {
+      const ancestors = [];
+      let current = parentById.get(circleId);
+      while (current) {
+        ancestors.push(current);
+        current = parentById.get(current);
+      }
+      return ancestors;
+    }
+
+    function getCircleDescendants(circleId, childrenById) {
+      const result = new Set();
+      const queue = [circleId];
+      while (queue.length) {
+        const current = queue.shift();
+        const children = childrenById.get(current) || [];
+        children.forEach(childId => {
+          if (result.has(childId)) return;
+          result.add(childId);
+          queue.push(childId);
+        });
+      }
+      return result;
+    }
+
+    function getExpandedCircleFilterSet(selectedIds) {
+      if (!selectedIds || selectedIds.size === 0) return new Set();
+      const { childrenById } = buildCircleForest(markData.circles);
+      const expanded = new Set();
+      selectedIds.forEach(id => {
+        expanded.add(String(id));
+        const descendants = getCircleDescendants(String(id), childrenById);
+        descendants.forEach(child => expanded.add(String(child)));
+      });
+      return expanded;
+    }
+
+    function circleOverlayStyle(circleId, depth) {
+      const hue = Math.abs(hashOffset(circleId, 41)) * 11 % 360;
+      const lightness = Math.max(34, 60 - depth * 4);
+      return {
+        fill: `hsla(${hue}, 70%, ${lightness}%, 0.14)`,
+        stroke: `hsla(${hue}, 70%, ${lightness + 6}%, 0.22)`,
+        glow: `hsla(${hue}, 70%, ${Math.min(80, lightness + 18)}%, 0.25)`
+      };
+    }
+
+    function convexHull(points) {
+      if (points.length <= 1) return points.slice();
+      const sorted = points.slice().sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+      const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+      const lower = [];
+      sorted.forEach(p => {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+          lower.pop();
+        }
+        lower.push(p);
+      });
+      const upper = [];
+      for (let i = sorted.length - 1; i >= 0; i -= 1) {
+        const p = sorted[i];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+          upper.pop();
+        }
+        upper.push(p);
+      }
+      upper.pop();
+      lower.pop();
+      return lower.concat(upper);
+    }
+
+    function expandPolygon(points, padding) {
+      const center = points.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+      center.x /= points.length;
+      center.y /= points.length;
+      return points.map(p => {
+        const dx = p.x - center.x;
+        const dy = p.y - center.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        const scale = (len + padding) / len;
+        return { x: center.x + dx * scale, y: center.y + dy * scale };
+      });
+    }
+
+    function buildRoundedPath(ctx, points, radius) {
+      if (points.length < 3) return;
+      const maxRadius = Math.max(0, radius);
+      const count = points.length;
+
+      const getVec = (from, to) => {
+        const dx = to.x - from.x;
+        const dy = to.y - from.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        return { x: dx / len, y: dy / len, len };
+      };
+
+      const first = points[0];
+      const prev = points[count - 1];
+      const v0 = getVec(first, prev);
+      const v1 = getVec(first, points[1]);
+      const r0 = Math.min(maxRadius, v0.len * 0.45, v1.len * 0.45);
+      const start = { x: first.x - v0.x * r0, y: first.y - v0.y * r0 };
+
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+
+      for (let i = 0; i < count; i += 1) {
+        const p = points[i];
+        const pPrev = points[(i - 1 + count) % count];
+        const pNext = points[(i + 1) % count];
+        const vPrev = getVec(p, pPrev);
+        const vNext = getVec(p, pNext);
+        const r = Math.min(maxRadius, vPrev.len * 0.45, vNext.len * 0.45);
+        const pIn = { x: p.x - vPrev.x * r, y: p.y - vPrev.y * r };
+        const pOut = { x: p.x + vNext.x * r, y: p.y + vNext.y * r };
+        ctx.lineTo(pIn.x, pIn.y);
+        ctx.quadraticCurveTo(p.x, p.y, pOut.x, pOut.y);
+      }
+      ctx.closePath();
+    }
+
+    function drawPaddedHull(ctx, points, padding, style, width, blur) {
+      if (points.length < 2) return;
+      const hull = convexHull(points);
+      if (hull.length < 2) return;
+
+      const hullLen = hull.length;
+      
+      // Step 1: Calculate perpendicular normals for each edge
+      const edgeNormals = [];
+      for (let i = 0; i < hullLen; i++) {
+        const p1 = hull[i];
+        const p2 = hull[(i + 1) % hullLen];
+        
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.sqrt(dx * dx + dy * dy) || 1;
+        
+        // Outward normal perpendicular to edge (perpendicular pointing outward)
+        // Reverse the normal to ensure outward direction
+        const nx = dy / len;
+        const ny = -dx / len;
+        
+        edgeNormals.push({ nx, ny, len });
+      }
+      
+      // Step 2: Calculate outer points using averaged normals for smooth corners
+      const outerPoints = [];
+      for (let i = 0; i < hullLen; i++) {
+        const prevNormal = edgeNormals[(i - 1 + hullLen) % hullLen];
+        const currNormal = edgeNormals[i];
+        
+        // Average the normals to handle corners smoothly
+        const avgNx = prevNormal.nx + currNormal.nx;
+        const avgNy = prevNormal.ny + currNormal.ny;
+        const avgLen = Math.sqrt(avgNx * avgNx + avgNy * avgNy) || 1;
+        
+        outerPoints.push({
+          x: hull[i].x + (avgNx / avgLen) * padding,
+          y: hull[i].y + (avgNy / avgLen) * padding
+        });
+      }
+      
+      // Step 3: Draw edge strips (rectangles with constant width)
+      ctx.fillStyle = style.fill;
+      ctx.shadowColor = style.glow;
+      ctx.shadowBlur = blur;
+      
+      for (let i = 0; i < hullLen; i++) {
+        const p1 = hull[i];
+        const p2 = hull[(i + 1) % hullLen];
+        const normal = edgeNormals[i];
+        
+        // Expand both endpoints along the edge-specific normal
+        const o1 = {
+          x: p1.x + normal.nx * padding,
+          y: p1.y + normal.ny * padding
+        };
+        const o2 = {
+          x: p2.x + normal.nx * padding,
+          y: p2.y + normal.ny * padding
+        };
+        
+        // Draw rectangle: o1, o2, p2, p1 (outer to inner order)
+        ctx.beginPath();
+        ctx.moveTo(o1.x, o1.y);
+        ctx.lineTo(o2.x, o2.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // Step 4: Draw corner arcs to smoothly connect edge strips
+      ctx.shadowBlur = 0;
+      for (let i = 0; i < hullLen; i++) {
+        const vertex = hull[i];
+        const prevNormal = edgeNormals[(i - 1 + hullLen) % hullLen];
+        const currNormal = edgeNormals[i];
+        
+        // Points at the end of previous edge and start of current edge
+        const p1_end = {
+          x: vertex.x + prevNormal.nx * padding,
+          y: vertex.y + prevNormal.ny * padding
+        };
+        const p2_start = {
+          x: vertex.x + currNormal.nx * padding,
+          y: vertex.y + currNormal.ny * padding
+        };
+        
+        // Calculate angles for arc
+        let angle1 = Math.atan2(p1_end.y - vertex.y, p1_end.x - vertex.x);
+        let angle2 = Math.atan2(p2_start.y - vertex.y, p2_start.x - vertex.x);
+        
+        // Normalize: ensure angle2 > angle1
+        while (angle2 <= angle1) angle2 += Math.PI * 2;
+        
+        // Draw arc to bridge the corner gap
+        ctx.beginPath();
+        ctx.arc(vertex.x, vertex.y, padding, angle1, angle2, false);
+        ctx.lineTo(vertex.x, vertex.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      // Step 5: Draw interior fill
+      ctx.beginPath();
+      hull.forEach((p, idx) => {
+        if (idx === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawCapsule(ctx, p0, p1, radius, style, width, blur) {
+      const dx = p1.x - p0.x;
+      const dy = p1.y - p0.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      
+      // Perpendicular normal (90° rotation, reversed for outward direction)
+      const nx = uy;
+      const ny = -ux;
+
+      // Rectangle corners (perpendicular expansion with constant width)
+      const left0 = { x: p0.x + nx * radius, y: p0.y + ny * radius };
+      const left1 = { x: p1.x + nx * radius, y: p1.y + ny * radius };
+      const right1 = { x: p1.x - nx * radius, y: p1.y - ny * radius };
+      const right0 = { x: p0.x - nx * radius, y: p0.y - ny * radius };
+
+      // Draw rectangular strip with constant width
+      ctx.fillStyle = style.fill;
+      ctx.shadowColor = style.glow;
+      ctx.shadowBlur = blur;
+      
+      ctx.beginPath();
+      ctx.moveTo(left0.x, left0.y);
+      ctx.lineTo(left1.x, left1.y);
+      ctx.lineTo(right1.x, right1.y);
+      ctx.lineTo(right0.x, right0.y);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Draw semicircle caps at each endpoint
+      ctx.shadowBlur = 0;
+      
+      // Angle from center to normal direction
+      const angle_n = Math.atan2(ny, nx);
+      
+      // Cap at p1 (connects left1 to right1)
+      ctx.beginPath();
+      ctx.arc(p1.x, p1.y, radius, angle_n, angle_n + Math.PI, false);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Cap at p0 (connects right0 to left0)
+      ctx.beginPath();
+      ctx.arc(p0.x, p0.y, radius, angle_n + Math.PI, angle_n + Math.PI * 2, false);
+      ctx.lineTo(p0.x, p0.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function buildCircleOverlayEntries(visibleNodeIds, circleToNodes, allowedCircleIds = null) {
+      const entries = [];
+      const { ordered, childrenById } = buildCircleForest(markData.circles);
+
+      ordered.forEach(({ id, depth }) => {
+        if (allowedCircleIds && !allowedCircleIds.has(String(id))) return;
+        const descendants = getCircleDescendants(id, childrenById);
+        const circleSet = new Set([id, ...descendants]);
+        const memberSet = new Set();
+
+        circleSet.forEach(circleId => {
+          const members = circleToNodes.get(circleId) || [];
+          members.forEach(nodeId => {
+            if (visibleNodeIds.has(nodeId)) memberSet.add(nodeId);
+          });
+        });
+
+        if (memberSet.size < 2) return;
+        const members = Array.from(memberSet);
+        const style = circleOverlayStyle(id, depth);
+        entries.push({ id, members, depth, style });
+      });
+
+      entries.sort((a, b) => a.depth - b.depth);
+      return entries;
+    }
+
+    function drawCircleOverlay(ctx) {
+      if (!showCircleOverlay || !showCircleOverlay.checked || !circleOverlayEntries.length) return;
+      const scale = network ? network.getScale() : 1;
+      const lineBase = Math.max(1.1, 2.4 / scale);
+      const blurBase = Math.max(6, 14 / scale);
+
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      circleOverlayEntries.forEach(entry => {
+        const positions = network.getPositions(entry.members);
+        const pts = Object.values(positions);
+        const padding = 28 + entry.depth * 10;
+        const blur = blurBase + entry.depth * 1.6;
+        if (pts.length === 2) {
+          drawCapsule(ctx, pts[0], pts[1], padding, entry.style, lineBase + entry.depth * 0.35, blur);
+          return;
+        }
+        if (pts.length < 3) return;
+        drawPaddedHull(ctx, pts, padding, entry.style, lineBase + entry.depth * 0.35, blur);
+      });
+      ctx.restore();
+    }
+
+    function setCircleParent(childId, parentId, parentById) {
+      const prevParent = parentById.get(childId);
+      if (prevParent && markData.circles[prevParent]) {
+        markData.circles[prevParent].children = (markData.circles[prevParent].children || [])
+          .filter(id => String(id) !== String(childId));
+      }
+
+      if (parentId && markData.circles[parentId]) {
+        if (!Array.isArray(markData.circles[parentId].children)) {
+          markData.circles[parentId].children = [];
+        }
+        const children = markData.circles[parentId].children.map(String);
+        if (!children.includes(String(childId))) {
+          markData.circles[parentId].children.push(String(childId));
+        }
+      }
+    }
+
+    function getGroupMembers(nodeId) {
+      const id = String(nodeId);
+      const members = groupMembersByNode.get(id);
+      if (members && members.length) return members;
+      return [id];
+    }
+
+    function getCircleMembers(nodeId) {
+      const id = String(nodeId);
+      const members = circleMembersByNode.get(id);
+      if (members && members.length) return members;
+      return [];
+    }
+
+    function renderGroupSelect(nodeId) {
+      const groupEntries = Object.entries(markData.groups)
+        .map(([id, g]) => ({ id, name: g.name || id }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      
+      const query = groupSearch.value.trim().toLowerCase();
+      const currentGroupId = markData.nodeToGroup[String(nodeId)] || "";
+      const filteredEntries = groupEntries.filter(g => !query || g.name.toLowerCase().includes(query));
+      if (!focusedGroupId || !markData.groups[focusedGroupId]) {
+        focusedGroupId = currentGroupId || null;
+      }
+      
+      let html = '';
+      
+      if (!filteredEntries.length && !groupEntries.length) {
+        html = '<div class="muted" style="padding:8px;">没有分组</div>';
+      } else if (!filteredEntries.length) {
+        html = '<div class="muted" style="padding:8px;">没有匹配项</div>';
+      } else {
+        html = filteredEntries.map(g => {
+          const checked = g.id === currentGroupId ? 'checked' : '';
+          const disabled = editingGroupId === g.id ? 'disabled' : '';
+          const isEditing = editingGroupId === g.id ? 'is-editing' : '';
+          
+          if (editingGroupId === g.id) {
+            return `
+              <div class="select-item ${isEditing}" data-id="${g.id}">
+                <input type="radio" name="groupRadio" ${checked} ${disabled} />
+                <input type="text" class="item-input" value="${safeText(g.name)}" data-original="${safeText(g.name)}" />
+                <div class="item-actions">
+                  <button class="icon-btn save" title="保存" data-action="save">✓</button>
+                  <button class="icon-btn" title="取消" data-action="cancel">✕</button>
+                </div>
+              </div>
+            `;
+          }
+          
+          const isFocused = focusedGroupId === g.id ? 'is-focused' : '';
+          return `
+            <div class="select-item ${isFocused}" data-id="${g.id}">
+              <input type="radio" name="groupRadio" ${checked} />
+              <span class="item-label">${safeText(g.name)}</span>
+              <div class="item-actions">
+                <button class="icon-btn" title="编辑" data-action="edit">✏️</button>
+                <button class="icon-btn delete" title="删除" data-action="delete">🗑️</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+      
+      // Add create button
+      if (creatingGroup) {
+        html += `
+          <div class="select-item is-creating" data-creating="true">
+            <span style="width:20px;text-align:center;">+</span>
+            <input type="text" class="item-input" placeholder="分组名称" autofocus />
+            <div class="item-actions">
+              <button class="icon-btn save" title="创建" data-action="create">✓</button>
+              <button class="icon-btn" title="取消" data-action="cancel-create">✕</button>
+            </div>
+          </div>
+        `;
+      } else if (nodeId) {
+        html += '<button class="button create-new-btn" data-action="start-create">新建分组</button>';
+      }
+      
+      groupSelectList.innerHTML = html;
+      
+      // Auto-focus input if editing or creating
+      if (editingGroupId || creatingGroup) {
+        const input = groupSelectList.querySelector('.item-input');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }
+      
+      // Update member list
+      if (focusedGroupId && markData.groups[focusedGroupId]) {
+        renderGroupMembers(focusedGroupId);
+      } else {
+        groupMemberList.textContent = '未选择分组';
+      }
+    }
+
+    function renderGroupMembers(groupId) {
+      if (!groupId) {
+        groupMemberList.textContent = "未选择分组";
+        return;
+      }
+
+      const members = Object.entries(markData.nodeToGroup)
+        .filter(([, gid]) => gid === groupId)
+        .map(([id]) => {
+          return getMemberLabel(id);
+        })
+        .sort((a, b) => a.localeCompare(b));
+
+      if (!members.length) {
+        groupMemberList.textContent = "没有成员";
+        return;
+      }
+
+      groupMemberList.innerHTML = members.map(m => `<div>${m}</div>`).join("");
+    }
+
+    function renderCircleMembers(circleId) {
+      if (!circleId) {
+        circleMemberList.textContent = "请选择一个圈子";
+        return;
+      }
+
+      const { childrenById } = buildCircleForest(markData.circles);
+      const descendants = getCircleDescendants(circleId, childrenById);
+      const circleSet = new Set([circleId, ...descendants]);
+
+      const members = Object.entries(markData.nodeToCircles)
+        .filter(([, ids]) => Array.isArray(ids) && ids.some(id => circleSet.has(String(id))))
+        .map(([id]) => {
+          return getMemberLabel(id);
+        })
+        .sort((a, b) => a.localeCompare(b));
+
+      if (!members.length) {
+        circleMemberList.textContent = "没有成员";
+        return;
+      }
+
+      circleMemberList.innerHTML = members.map(m => `<div>${m}</div>`).join("");
+    }
+
+    function updateMarkUI(nodeId) {
+      editingGroupId = null;
+      editingCircleId = null;
+      creatingGroup = false;
+      creatingCircle = false;
+      focusedGroupId = null;
+      focusedCircleId = null;
+      if (groupClearBtn) groupClearBtn.disabled = true;
+      
+      if (!nodeId) {
+        renderGroupSelect("");
+        renderGroupMembers("");
+        circleSelectList.textContent = "没有圈子";
+        renderCircleMembers("");
+        return;
+      }
+
+      renderGroupSelect(nodeId);
+      renderCircleSelect(nodeId);
+      if (groupClearBtn) {
+        const groupId = markData.nodeToGroup[String(nodeId)] || "";
+        groupClearBtn.disabled = !groupId;
+      }
+    }
+
+    function renderCircleSelect(nodeId) {
+      const { ordered, parentById, childrenById } = buildCircleForest(markData.circles);
+      const query = circleSearch.value.trim().toLowerCase();
+      const explicitIds = new Set(markData.nodeToCircles[String(nodeId)] || []);
+      const impliedIds = new Set();
+
+      explicitIds.forEach(id => {
+        getCircleAncestors(String(id), parentById).forEach(ancestorId => impliedIds.add(ancestorId));
+      });
+
+      if (!focusedCircleId || !markData.circles[focusedCircleId]) {
+        focusedCircleId = [...explicitIds][0] || null;
+      }
+
+      let visibleOrdered = ordered;
+      if (query) {
+        const visibleIds = new Set();
+        ordered.forEach(({ id }) => {
+          const name = safeText(markData.circles[id] && markData.circles[id].name || id).toLowerCase();
+          if (name.includes(query)) {
+            visibleIds.add(id);
+            getCircleAncestors(id, parentById).forEach(ancestorId => visibleIds.add(ancestorId));
+          }
+        });
+        visibleOrdered = ordered.filter(item => visibleIds.has(item.id));
+      }
+
+      let html = '';
+      if (!visibleOrdered.length && !Object.keys(markData.circles).length) {
+        html = '<div class="muted" style="padding:8px;">没有圈子</div>';
+      } else if (!visibleOrdered.length) {
+        html = '<div class="muted" style="padding:8px;">没有匹配项</div>';
+      } else {
+        const rootDrop = '<div class="tree-root-drop" data-drop="root">拖到此处设为根</div>';
+        html = rootDrop + visibleOrdered.map(({ id, depth }) => {
+          const circle = markData.circles[id] || { name: id };
+          const isExplicit = explicitIds.has(id);
+          const isImplied = !isExplicit && impliedIds.has(id);
+          const checked = isExplicit || isImplied ? 'checked' : '';
+          const disabled = isImplied || editingCircleId === id ? 'disabled' : '';
+          const isEditing = editingCircleId === id ? 'is-editing' : '';
+          const impliedClass = isImplied ? 'is-implied' : '';
+          const focusedClass = focusedCircleId === id ? 'is-focused' : '';
+          const indent = Math.min(6, depth) * 12;
+          const branch = depth > 0 ? `${"| ".repeat(Math.min(6, depth) - 1)}|- ` : "";
+
+          if (editingCircleId === id) {
+            return `
+              <div class="select-item ${isEditing}" data-id="${id}">
+                <input type="checkbox" ${checked} ${disabled} />
+                <input type="text" class="item-input" value="${safeText(circle.name)}" data-original="${safeText(circle.name)}" style="padding-left:${indent}px;" />
+                <div class="item-actions">
+                  <button class="icon-btn save" title="保存" data-action="save">✓</button>
+                  <button class="icon-btn" title="取消" data-action="cancel">✕</button>
+                </div>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="select-item ${impliedClass} ${focusedClass}" data-id="${id}" draggable="true">
+              <input type="checkbox" ${checked} ${disabled} />
+              <span class="item-label">
+                <span class="drag-handle" title="拖动移动">||</span>
+                <span class="tree-branch">${branch}</span>
+                <span class="tree-node-dot"></span>
+                ${safeText(circle.name || id)}${isImplied ? ' <span class="muted" style="margin-left:6px;font-size:11px;">（继承）</span>' : ''}
+              </span>
+              <div class="item-actions">
+                <button class="icon-btn" title="编辑" data-action="edit">✏️</button>
+                <button class="icon-btn delete" title="删除" data-action="delete">🗑️</button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      if (focusedCircleId && markData.circles[focusedCircleId]) {
+        renderCircleMembers(focusedCircleId);
+      } else {
+        circleMemberList.textContent = '未选择圈子';
+      }
+
+      if (creatingCircle) {
+        html += `
+          <div class="select-item is-creating" data-creating="true">
+            <span style="width:20px;text-align:center;">+</span>
+            <input type="text" class="item-input" placeholder="圈子名称" autofocus />
+            <div class="item-actions">
+              <button class="icon-btn save" title="创建" data-action="create">✓</button>
+              <button class="icon-btn" title="取消" data-action="cancel-create">✕</button>
+            </div>
+          </div>
+        `;
+      } else if (nodeId) {
+        html += '<button class="button create-new-btn" data-action="start-create">新建圈子</button>';
+      }
+
+      circleSelectList.innerHTML = html;
+
+      if (editingCircleId || creatingCircle) {
+        const input = circleSelectList.querySelector('.item-input');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }
+    }
+
+    function buildData(members) {
+      rawMembers = members;
+      membersById = new Map();
+      hasOwnershipCycle = false;
+
+      members.forEach(m => {
+        membersById.set(String(m.memberNumber), m);
+      });
+
+      const nodes = [];
+      const edges = [];
+
+      members.forEach(m => {
+        const id = String(m.memberNumber);
+        const label = `${getPreferredName(m)} (#${id})`;
+        nodes.push({
+          id,
+          label,
+          group: m.title || "无",
+          title: `${safeText(m.title)}\n${safeText(m.nickname)}`.trim(),
+          value: 1
+        });
+
+        if (m.ownership && m.ownership.MemberNumber !== undefined) {
+          const ownerId = String(m.ownership.MemberNumber);
+          edges.push({
+            id: `o-${ownerId}-${id}`,
+            from: ownerId,
+            to: id,
+            arrows: "to",
+            dashes: false,
+            color: { color: "#6ac9ff" },
+            width: 1,
+            dataType: "ownership"
+          });
+        }
+
+        if (Array.isArray(m.lovership)) {
+          m.lovership.forEach(l => {
+            if (!l || l.MemberNumber === undefined) return;
+            const loverId = String(l.MemberNumber);
+            edges.push({
+              id: `l-${id}-${loverId}`,
+              from: id,
+              to: loverId,
+              arrows: "",
+              dashes: true,
+              color: { color: "#ffb86b" },
+              width: 1,
+              dataType: "lovership"
+            });
+          });
+        }
+      });
+
+      // Add placeholder nodes for referenced members not in the list.
+      const nodeIds = new Set(nodes.map(n => n.id));
+      edges.forEach(e => {
+        if (!nodeIds.has(e.from)) {
+          nodes.push({ id: e.from, label: `未知 (#${e.from})`, group: "未知" });
+          nodeIds.add(e.from);
+        }
+        if (!nodeIds.has(e.to)) {
+          nodes.push({ id: e.to, label: `未知 (#${e.to})`, group: "未知" });
+          nodeIds.add(e.to);
+        }
+      });
+
+      allNodes = nodes;
+      allEdges = edges;
+
+      statMembers.textContent = nodes.length;
+      statOwnership.textContent = edges.filter(e => e.dataType === "ownership").length;
+      statLovership.textContent = edges.filter(e => e.dataType === "lovership").length;
+
+      const titles = Array.from(new Set(members.map(m => m.title || "无"))).sort();
+      titleFilter.innerHTML = "<option value=\"\">全部</option>" + titles.map(t => `<option value=\"${t}\">${t}</option>`).join("");
+
+      hasOwnershipCycle = detectOwnershipCycle(edges);
+      if (hasOwnershipCycle) {
+        warning.textContent = "检测到主仆关系循环。";
+      } else {
+        warning.textContent = "";
+      }
+
+      renderCircleFilters();
+    }
+
+    function updateNodeLabels() {
+      allNodes = allNodes.map(n => ({
+        ...n,
+        label: getMemberLabel(n.id)
+      }));
+    }
+
+    function mergeMembers(memberLists) {
+      const merged = new Map();
+
+      memberLists.flat().forEach(m => {
+        if (!m || m.memberNumber === undefined || m.memberNumber === null) return;
+        const id = String(m.memberNumber);
+        const seen = Number(m.seen || 0);
+        const prev = merged.get(id);
+        if (!prev || seen >= Number(prev.seen || 0)) {
+          merged.set(id, m);
+        }
+      });
+
+      return Array.from(merged.values());
+    }
+
+    function detectOwnershipCycle(edges) {
+      const adj = new Map();
+      edges.forEach(e => {
+        if (e.dataType !== "ownership") return;
+        if (!adj.has(e.from)) adj.set(e.from, []);
+        adj.get(e.from).push(e.to);
+      });
+
+      const visiting = new Set();
+      const visited = new Set();
+
+      function dfs(node) {
+        if (visiting.has(node)) return true;
+        if (visited.has(node)) return false;
+        visiting.add(node);
+        const next = adj.get(node) || [];
+        for (const n of next) {
+          if (dfs(n)) return true;
+        }
+        visiting.delete(node);
+        visited.add(node);
+        return false;
+      }
+
+      for (const node of adj.keys()) {
+        if (dfs(node)) return true;
+      }
+
+      return false;
+    }
+
+    function scheduleRender(usePhysics = false) {
+      if (renderPending) return;
+      nextRenderUsePhysics = nextRenderUsePhysics || usePhysics;
+      renderPending = true;
+      requestAnimationFrame(() => {
+        renderPending = false;
+        const useSim = nextRenderUsePhysics;
+        nextRenderUsePhysics = false;
+        applyFilters(useSim);
+      });
+    }
+
+    function computeGraph(positionMap) {
+      if (!window.vis || !window.vis.Network) {
+        warning.textContent = "vis-network 加载失败。请检查网络连接或改用本地库。";
+        return null;
+      }
+
+      const { groupToNodes, nodeToGroup } = buildGroupIndex(allNodes);
+      const { circleToNodes } = buildCircleIndex(allNodes);
+      groupMembersByNode = new Map();
+      groupToNodes.forEach((nodes, groupId) => {
+        nodes.forEach(id => groupMembersByNode.set(id, [...nodes]));
+      });
+      circleMembersByNode = new Map();
+      circleToNodes.forEach((nodes, circleId) => {
+        nodes.forEach(id => {
+          if (!circleMembersByNode.has(id)) circleMembersByNode.set(id, []);
+          circleMembersByNode.get(id).push(circleId);
+        });
+      });
+
+      const q = searchInput.value.trim().toLowerCase();
+      const title = titleFilter.value;
+      const showO = showOwnership.checked;
+      const showL = showLovership.checked;
+      const hideIso = hideIsolated.checked;
+      const depth = Math.max(1, Number(neighborDepth.value || 1));
+
+      const allowedNodes = new Set();
+
+      allNodes.forEach(n => {
+        const m = membersById.get(n.id);
+        const name = safeText(m && m.name).toLowerCase();
+        const nickname = safeText(m && m.nickname).toLowerCase();
+        const idStr = n.id;
+        const titleMatch = !title || (m && (m.title || "无") === title);
+        const searchMatch = !q || name.includes(q) || nickname.includes(q) || idStr.includes(q);
+
+        if (titleMatch && searchMatch) {
+          allowedNodes.add(n.id);
+        }
+      });
+
+      const expandedAllowed = new Set();
+      allowedNodes.forEach(id => {
+        const groupId = nodeToGroup.get(id);
+        if (groupId && groupToNodes.has(groupId)) {
+          groupToNodes.get(groupId).forEach(memberId => expandedAllowed.add(memberId));
+        } else {
+          expandedAllowed.add(id);
+        }
+      });
+
+      const edgesAllowedByType = allEdges.filter(e => {
+        if (e.dataType === "ownership" && !showO) return false;
+        if (e.dataType === "lovership" && !showL) return false;
+        const fromGroup = nodeToGroup.get(e.from);
+        if (fromGroup && fromGroup === nodeToGroup.get(e.to)) return false;
+        return true;
+      });
+
+      const focusSeed = selectedNodeId ? new Set(getGroupMembers(selectedNodeId)) : new Set();
+      const pinnedSeed = new Set(pinnedNodes);
+      const seedNodes = new Set([...expandedAllowed, ...focusSeed, ...pinnedSeed]);
+      const expandedNodes = expandByDepth(seedNodes, edgesAllowedByType, depth);
+      const groupExpanded = new Set(expandedNodes);
+      expandedNodes.forEach(id => {
+        const groupId = nodeToGroup.get(id);
+        if (groupId && groupToNodes.has(groupId)) {
+          groupToNodes.get(groupId).forEach(memberId => groupExpanded.add(memberId));
+        }
+      });
+
+      let edges = edgesAllowedByType.filter(e => groupExpanded.has(e.from) && groupExpanded.has(e.to));
+      let nodes = allNodes.filter(n => groupExpanded.has(n.id));
+      const seedNodeList = allNodes.filter(n => expandedAllowed.has(n.id));
+
+      const groupEdges = [];
+      groupToNodes.forEach((members, groupId) => {
+        const visibleMembers = members.filter(id => nodes.some(n => n.id === id));
+        if (visibleMembers.length < 2) return;
+        const anchor = visibleMembers[0];
+        for (let i = 1; i < visibleMembers.length; i += 1) {
+          const target = visibleMembers[i];
+          groupEdges.push({
+            id: `g-${groupId}-${anchor}-${target}`,
+            from: anchor,
+            to: target,
+            dataType: "group",
+            color: { color: "rgba(106, 201, 255, 0.45)" },
+            width: 1.2,
+            dashes: false,
+            length: 14,
+            physics: true
+          });
+        }
+      });
+
+      const circleEdges = [];
+
+      if (hideIso) {
+        const connected = new Set();
+        [...edges, ...groupEdges].forEach(e => { connected.add(e.from); connected.add(e.to); });
+        pinnedNodes.forEach(id => connected.add(String(id)));
+        if (selectedNodeId) connected.add(String(selectedNodeId));
+        nodes = nodes.filter(n => connected.has(n.id));
+      }
+
+      if (positionMap) {
+        const neighborMap = new Map();
+        edges.forEach(e => {
+          if (!neighborMap.has(e.from)) neighborMap.set(e.from, []);
+          if (!neighborMap.has(e.to)) neighborMap.set(e.to, []);
+          neighborMap.get(e.from).push(e.to);
+          neighborMap.get(e.to).push(e.from);
+        });
+
+        nodes = nodes.map(n => {
+          const pos = positionMap[n.id];
+          if (pos) {
+            return { ...n, x: pos.x, y: pos.y, fixed: false };
+          }
+
+          const neighbors = neighborMap.get(n.id) || [];
+          const neighborPositions = neighbors.map(id => positionMap[id]).filter(Boolean);
+          if (neighborPositions.length) {
+            const avg = neighborPositions.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+            const x = avg.x / neighborPositions.length;
+            const y = avg.y / neighborPositions.length;
+            return { ...n, x: x + hashOffset(n.id) * 6, y: y + hashOffset(n.id, 7) * 6, fixed: false };
+          }
+
+          return { ...n, x: hashOffset(n.id, 13) * 50, y: hashOffset(n.id, 29) * 50, fixed: false };
+        });
+      }
+
+      nodes = applyGroupStyle(nodes);
+      nodes = applyGroupHighlight(nodes, selectedNodeId);
+      nodes = applyCircleFilterHighlight(nodes);
+      nodes = applyPinnedNodes(nodes);
+
+      const displayNodes = nodes;
+      const nodesById = new Map(displayNodes.map(n => [n.id, n]));
+      const circleHubNodes = [];
+      circleToNodes.forEach((members, circleId) => {
+        const visibleMembers = members.filter(id => nodesById.has(id));
+        if (visibleMembers.length < 2) return;
+        const hubId = `c-hub-${circleId}`;
+        const hubNode = {
+          id: hubId,
+          label: "",
+          value: 0.1,
+          size: 1,
+          shape: "dot",
+          color: { background: "rgba(0,0,0,0)", border: "rgba(0,0,0,0)" },
+          font: { size: 1, color: "rgba(0,0,0,0)" },
+          opacity: 0,
+          physics: true,
+          isCircleHub: true
+        };
+
+        const hubPositions = visibleMembers
+          .map(id => nodesById.get(id))
+          .filter(n => n && typeof n.x === "number" && typeof n.y === "number");
+        if (hubPositions.length) {
+          const avg = hubPositions.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+          hubNode.x = avg.x / hubPositions.length;
+          hubNode.y = avg.y / hubPositions.length;
+          hubNode.fixed = false;
+        }
+
+        circleHubNodes.push(hubNode);
+        visibleMembers.forEach(target => {
+          circleEdges.push({
+            id: `c-${circleId}-${hubId}-${target}`,
+            from: hubId,
+            to: target,
+            dataType: "circle",
+            color: { color: "rgba(0,0,0,0)" },
+            width: 0.1,
+            dashes: true,
+            length: 140,
+            physics: true
+          });
+        });
+      });
+
+      const graphNodes = [...displayNodes, ...circleHubNodes];
+
+      const overlayCircleIds = circleFilterEnabled.checked && circleFilterSelected.size
+        ? getExpandedCircleFilterSet(circleFilterSelected)
+        : null;
+      const overlayEntries = buildCircleOverlayEntries(
+        new Set(displayNodes.map(n => n.id)),
+        circleToNodes,
+        overlayCircleIds
+      );
+
+      const signature = JSON.stringify({
+        nodes: displayNodes.map(n => `${n.id}:${markData.nodeToGroup[n.id] || ""}:${(markData.nodeToCircles[n.id] || []).join(",")}:${pinnedNodes.has(n.id) ? "p" : ""}`),
+        edges: [...edges.map(e => e.id), ...groupEdges.map(e => e.id), ...circleEdges.map(e => e.id)],
+        selected: selectedNodeId || "",
+        display: displayNickname && displayNickname.checked ? "nick" : "name",
+        overlay: showCircleOverlay && showCircleOverlay.checked ? "on" : "off"
+      });
+
+      const isSingleSearch = !!q && allowedNodes.size === 1;
+
+      return {
+        nodes: graphNodes,
+        displayNodes,
+        edges: [...edges, ...groupEdges, ...circleEdges],
+        signature,
+        seedNodes: seedNodeList,
+        isSingleSearch,
+        circleToNodes,
+        overlayEntries
+      };
+    }
+
+    function getAdaptivePhysics(nodeCount, edgeCount, isSingleSearch) {
+      const scale = Math.max(1, Math.sqrt(nodeCount));
+      const baseLength = isSingleSearch ? 80 : 100;
+      const springLength = Math.round(baseLength * Math.min(2.2, scale / 3 + 1));
+      const springConstant = isSingleSearch ? 0.018 : 0.012;
+      const damping = isSingleSearch ? 0.5 : 0.4;
+      const grav = isSingleSearch ? -9000 : -12000;
+
+      return {
+        enabled: true,
+        solver: "barnesHut",
+        stabilization: { iterations: 200, updateInterval: 20 },
+        barnesHut: {
+          gravitationalConstant: grav,
+          springLength,
+          springConstant,
+          damping
+        },
+        minVelocity: 0.8,
+        maxVelocity: 30
+      };
+    }
+
+    function expandByDepth(seedNodes, edges, depth) {
+      const expanded = new Set(seedNodes);
+      if (!seedNodes.size || depth <= 0) return expanded;
+
+      const neighborMap = new Map();
+      edges.forEach(e => {
+        if (!neighborMap.has(e.from)) neighborMap.set(e.from, []);
+        if (!neighborMap.has(e.to)) neighborMap.set(e.to, []);
+        neighborMap.get(e.from).push(e.to);
+        neighborMap.get(e.to).push(e.from);
+      });
+
+      let frontier = new Set(seedNodes);
+      for (let step = 0; step < depth; step += 1) {
+        const next = new Set();
+        frontier.forEach(nodeId => {
+          const neighbors = neighborMap.get(nodeId) || [];
+          neighbors.forEach(n => {
+            if (!expanded.has(n)) {
+              expanded.add(n);
+              next.add(n);
+            }
+          });
+        });
+        if (!next.size) break;
+        frontier = next;
+      }
+
+      return expanded;
+    }
+
+    function applyFilters(usePhysics = false) {
+      const positionMap = !usePhysics && network ? network.getPositions() : null;
+      const graph = computeGraph(positionMap);
+      if (!graph) return;
+      const { nodes, displayNodes, edges, signature, seedNodes, isSingleSearch, circleToNodes, overlayEntries } = graph;
+      if (signature === currentGraphSignature) return;
+
+      circleOverlayEntries = overlayEntries || [];
+
+      renderFilteredList(displayNodes);
+      renderFixedList();
+      renderCircleFilters(circleToNodes);
+
+      const data = {
+        nodes: new vis.DataSet(nodes),
+        edges: new vis.DataSet(edges)
+      };
+
+      if (network) {
+        const physics = manualPhysicsEnabled
+          ? getAdaptivePhysics(nodes.length, edges.length, isSingleSearch)
+          : (usePhysics ? getAdaptivePhysics(nodes.length, edges.length, isSingleSearch) : { enabled: false });
+        network.setOptions({ physics });
+        network.setData(data);
+      } else {
+        const options = getOptions();
+        if (manualPhysicsEnabled) options.physics = getAdaptivePhysics(nodes.length, edges.length, isSingleSearch);
+        network = new vis.Network(graphContainer, data, options);
+        network.on("afterDrawing", ctx => drawCircleOverlay(ctx));
+        network.on("selectNode", params => {
+          if (suppressSelectionEvent) return;
+          const next = params.nodes[0];
+          if (selectedNodeId === next) return;
+          stopPhysicsForFocus();
+          selectedNodeId = next;
+          suppressSelectionEvent = true;
+          network.selectNodes([String(selectedNodeId)], false);
+          setTimeout(() => { suppressSelectionEvent = false; }, 0);
+          showDetail(selectedNodeId);
+          pendingViewAnchor = captureViewAnchor(selectedNodeId);
+          suppressAutoFit = true;
+          scheduleRender(false);
+        });
+        network.on("deselectNode", () => {
+          if (suppressSelectionEvent) return;
+          if (selectedNodeId === null) return;
+          selectedNodeId = null;
+          hideDetail();
+          suppressAutoFit = true;
+          scheduleRender(false);
+        });
+        network.on("doubleClick", params => {
+          if (params.nodes.length > 0) {
+            const nodeId = String(params.nodes[0]);
+            if (pinnedNodes.has(nodeId)) {
+              pinnedNodes.delete(nodeId);
+            } else {
+              pinnedNodes.add(nodeId);
+            }
+            saveMarkData();
+            pendingViewAnchor = captureViewAnchor(nodeId);
+            suppressAutoFit = true;
+            renderFixedList();
+            scheduleRender(false);
+          }
+        });
+      }
+
+      if (pendingViewAnchor && network) {
+        const { nodeId, nodePos, viewPos, scale } = pendingViewAnchor;
+        const nextPos = network.getPositions([nodeId])[nodeId];
+        if (nextPos) {
+          const dx = nextPos.x - nodePos.x;
+          const dy = nextPos.y - nodePos.y;
+          network.moveTo({ position: { x: viewPos.x + dx, y: viewPos.y + dy }, scale, animation: false });
+        }
+        pendingViewAnchor = null;
+      }
+
+      if (nodes.length && nodes.length !== lastVisibleNodeCount && !suppressAutoFit) {
+        requestAnimationFrame(() => {
+          if (network) network.fit({ animation: false });
+        });
+      }
+      lastVisibleNodeCount = nodes.length;
+      suppressAutoFit = false;
+
+      const visibleNodeIds = new Set(nodes.map(n => n.id));
+      if (selectedNodeId && !visibleNodeIds.has(String(selectedNodeId))) {
+        selectedNodeId = null;
+        hideDetail();
+      } else if (selectedNodeId && network) {
+        suppressSelectionEvent = true;
+        network.selectNodes([String(selectedNodeId)], false);
+        setTimeout(() => { suppressSelectionEvent = false; }, 0);
+      }
+
+      currentGraphSignature = signature;
+
+      if (network && !manualPhysicsEnabled) {
+        if (usePhysics) {
+          network.once("stabilizationIterationsDone", () => {
+            network.setOptions({ physics: { enabled: false } });
+          });
+        } else {
+          network.setOptions({ physics: { enabled: false } });
+        }
+      }
+    }
+
+    function hashOffset(value, salt = 0) {
+      const text = String(value) + "|" + salt;
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1) {
+        hash = ((hash << 5) - hash) + text.charCodeAt(i);
+        hash |= 0;
+      }
+      return (hash % 23) - 11;
+    }
+
+    function getOptions() {
+      return {
+        physics: {
+          enabled: true,
+          solver: "barnesHut",
+          stabilization: { iterations: 160, updateInterval: 20 },
+          barnesHut: { gravitationalConstant: -12000, springLength: 100, springConstant: 0.012, damping: 0.4 },
+          minVelocity: 1,
+          maxVelocity: 30
+        },
+        nodes: {
+          shape: "dot",
+          size: 8,
+          font: { color: "#e7eaf0", size: 24 },
+          borderWidth: 1,
+          color: { border: "#2b3240", background: "#1f2430" }
+        },
+        edges: {
+          smooth: false,
+          font: { size: 10, color: "#9aa3b2" }
+        },
+        interaction: {
+          hover: false,
+          navigationButtons: false
+        }
+      };
+    }
+
+    function showDetail(id) {
+      const m = membersById.get(String(id));
+      if (!m) {
+        detailName.textContent = `未知 (#${id})`;
+        detailMeta.textContent = "无数据";
+        detailOwnership.textContent = "-";
+        detailLovership.textContent = "-";
+        detailDesc.textContent = "无描述";
+      } else {
+        const name = getPreferredName(m);
+        detailName.textContent = `${name} (#${m.memberNumber})`;
+        detailMeta.textContent = [m.title, m.nickname, m.assetFamily].filter(Boolean).join(" | ");
+        if (m.ownership && m.ownership.MemberNumber !== undefined) {
+          detailOwnership.textContent = `${m.ownership.Name || "未知"} (#${m.ownership.MemberNumber})`;
+        } else {
+          detailOwnership.textContent = "-";
+        }
+        if (Array.isArray(m.lovership) && m.lovership.length) {
+          detailLovership.textContent = m.lovership.map(l => `${l.Name || "未知"}${l.MemberNumber !== undefined ? ` (#${l.MemberNumber})` : ""}`).join(", ");
+        } else {
+          detailLovership.textContent = "-";
+        }
+        detailDesc.textContent = safeText(m.descriptionDecoded || "无描述");
+      }
+      updateMarkUI(id);
+      detailEmpty.style.display = "none";
+      detail.style.display = "block";
+    }
+
+    function hideDetail() {
+      detail.style.display = "none";
+      detailEmpty.style.display = "block";
+      updateMarkUI(null);
+    }
+
+    fileInput.addEventListener("change", async (event) => {
+      const files = Array.from(event.target.files || []);
+      if (!files.length) return;
+      try {
+        currentDataKey = buildDataKey(files);
+        markData = loadMarkData();
+        const parsedLists = await Promise.all(files.map(async f => {
+          const text = await f.text();
+          const data = JSON.parse(text);
+          if (!Array.isArray(data)) throw new Error(`期望在 ${f.name} 中读取到数组`);
+          return data;
+        }));
+        const merged = mergeMembers(parsedLists);
+        fileStatus.textContent = files.length === 1 ? files[0].name : `${files.length} 个文件已合并`;
+        buildData(merged);
+        updateMarkUI(selectedNodeId);
+        scheduleRender(true);
+      } catch (err) {
+        alert("解析 JSON 失败：" + err.message);
+      }
+    });
+
+    exportMarksBtn.addEventListener("click", () => {
+      const payload = {
+        version: markDataVersion,
+        nodeToGroup: markData.nodeToGroup,
+        groups: markData.groups,
+        nodeToCircles: markData.nodeToCircles,
+        circles: markData.circles
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "bc-graph-groups.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    importMarksBtn.addEventListener("click", () => {
+      importMarksInput.value = "";
+      importMarksInput.click();
+    });
+
+    importMarksInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        const normalized = normalizeMarkData(parsed);
+        markData.nodeToGroup = normalized.nodeToGroup || {};
+        markData.groups = normalized.groups || {};
+        markData.nodeToCircles = normalized.nodeToCircles || {};
+        markData.circles = normalized.circles || {};
+        saveMarkData();
+        updateMarkUI(selectedNodeId);
+        renderCircleFilters();
+        invalidateGraph();
+      } catch (err) {
+        alert("导入分组数据失败：" + err.message);
+      }
+    });
+
+    [searchInput, titleFilter, showOwnership, showLovership, hideIsolated, neighborDepth].forEach(el => {
+      el.addEventListener("input", () => scheduleRender(true));
+      el.addEventListener("change", () => scheduleRender(true));
+    });
+
+    if (displayNickname) {
+      displayNickname.addEventListener("change", () => {
+        updateNodeLabels();
+        renderFixedList();
+        if (focusedGroupId) renderGroupMembers(focusedGroupId);
+        if (focusedCircleId) renderCircleMembers(focusedCircleId);
+        if (selectedNodeId) {
+          const m = membersById.get(String(selectedNodeId));
+          detailName.textContent = m
+            ? `${getPreferredName(m)} (#${selectedNodeId})`
+            : `未知 (#${selectedNodeId})`;
+        }
+        invalidateGraph();
+      });
+    }
+
+    // Group event handlers
+    groupSelectList.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!target || target.type !== "radio") return;
+      if (!selectedNodeId) return;
+      
+      const item = target.closest('.select-item');
+      const groupId = item ? item.dataset.id : null;
+      
+      if (groupId) {
+        markData.nodeToGroup[String(selectedNodeId)] = groupId;
+      } else {
+        delete markData.nodeToGroup[String(selectedNodeId)];
+      }
+      saveMarkData();
+      updateMarkUI(selectedNodeId);
+      invalidateGraph();
+    });
+
+    groupSelectList.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!target) return;
+      
+      const action = target.dataset.action;
+      const item = target.closest('.select-item');
+      const createBtn = target.closest('.create-new-btn');
+      
+      if (action === 'start-create') {
+        creatingGroup = true;
+        renderGroupSelect(selectedNodeId);
+        return;
+      }
+      
+      if (action === 'create') {
+        const input = item.querySelector('.item-input');
+        const name = input.value.trim();
+        if (!name) return;
+        
+        const id = `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        markData.groups[id] = { name, notes: "" };
+        markData.nodeToGroup[String(selectedNodeId)] = id;
+        saveMarkData();
+        creatingGroup = false;
+        updateMarkUI(selectedNodeId);
+        invalidateGraph();
+        return;
+      }
+      
+      if (action === 'cancel-create') {
+        creatingGroup = false;
+        renderGroupSelect(selectedNodeId);
+        return;
+      }
+      
+      if (!item || !item.dataset.id) return;
+      const groupId = item.dataset.id;
+      
+      if (action === 'edit') {
+        editingGroupId = groupId;
+        renderGroupSelect(selectedNodeId);
+        return;
+      }
+      
+      if (action === 'save') {
+        const input = item.querySelector('.item-input');
+        const newName = input.value.trim();
+        if (!newName) return;
+        
+        markData.groups[groupId].name = newName;
+        saveMarkData();
+        editingGroupId = null;
+        updateMarkUI(selectedNodeId);
+        invalidateGraph();
+        return;
+      }
+      
+      if (action === 'cancel') {
+        editingGroupId = null;
+        renderGroupSelect(selectedNodeId);
+        return;
+      }
+      
+      if (action === 'delete') {
+        if (!confirm(`Delete group "${markData.groups[groupId].name}"?`)) return;
+        
+        Object.keys(markData.nodeToGroup).forEach(id => {
+          if (markData.nodeToGroup[id] === groupId) {
+            delete markData.nodeToGroup[id];
+          }
+        });
+        delete markData.groups[groupId];
+        saveMarkData();
+        updateMarkUI(selectedNodeId);
+        invalidateGraph();
+        return;
+      }
+
+      if (item && !action) {
+        if (target.tagName !== "INPUT" && target.tagName !== "BUTTON") {
+          focusedGroupId = groupId;
+          renderGroupSelect(selectedNodeId);
+        }
+      }
+    });
+
+    groupSelectList.addEventListener("keydown", (event) => {
+      if (event.key === 'Enter') {
+        const target = event.target;
+        if (target.classList.contains('item-input')) {
+          const item = target.closest('.select-item');
+          const saveBtn = item.querySelector('[data-action="save"], [data-action="create"]');
+          if (saveBtn) saveBtn.click();
+        }
+      }
+      if (event.key === 'Escape') {
+        const target = event.target;
+        if (target.classList.contains('item-input')) {
+          const item = target.closest('.select-item');
+          const cancelBtn = item.querySelector('[data-action="cancel"], [data-action="cancel-create"]');
+          if (cancelBtn) cancelBtn.click();
+        }
+      }
+    });
+
+    groupSearch.addEventListener("input", () => {
+      renderGroupSelect(selectedNodeId);
+    });
+
+    // Circle event handlers
+
+    circleSelectList.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!target || target.type !== "checkbox") return;
+      if (!selectedNodeId) return;
+      
+      const item = target.closest('.select-item');
+      const circleId = item ? item.dataset.id : null;
+      if (!circleId) return;
+      
+      const existing = new Set(markData.nodeToCircles[String(selectedNodeId)] || []);
+      
+      if (target.checked) {
+        existing.add(circleId);
+      } else {
+        existing.delete(circleId);
+      }
+      
+      if (existing.size) {
+        markData.nodeToCircles[String(selectedNodeId)] = Array.from(existing);
+      } else {
+        delete markData.nodeToCircles[String(selectedNodeId)];
+      }
+      
+      saveMarkData();
+      renderCircleFilters();
+      updateMarkUI(selectedNodeId);
+      invalidateGraph();
+    });
+
+    circleSelectList.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!target) return;
+      
+      const action = target.dataset.action;
+      const item = target.closest('.select-item');
+      const createBtn = target.closest('.create-new-btn');
+      
+      if (action === 'start-create') {
+        creatingCircle = true;
+        renderCircleSelect(selectedNodeId);
+        return;
+      }
+      
+      if (action === 'create') {
+        const input = item.querySelector('.item-input');
+        const name = input.value.trim();
+        if (!name) return;
+        
+        const id = `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        markData.circles[id] = { name, notes: "", children: [] };
+        const existing = new Set(markData.nodeToCircles[String(selectedNodeId)] || []);
+        existing.add(id);
+        markData.nodeToCircles[String(selectedNodeId)] = Array.from(existing);
+        saveMarkData();
+        creatingCircle = false;
+        renderCircleFilters();
+        updateMarkUI(selectedNodeId);
+        invalidateGraph();
+        return;
+      }
+      
+      if (action === 'cancel-create') {
+        creatingCircle = false;
+        renderCircleSelect(selectedNodeId);
+        return;
+      }
+      
+      if (!item || !item.dataset.id) return;
+      const circleId = item.dataset.id;
+      
+      if (action === 'edit') {
+        editingCircleId = circleId;
+        renderCircleSelect(selectedNodeId);
+        return;
+      }
+      
+      if (action === 'save') {
+        const input = item.querySelector('.item-input');
+        const newName = input.value.trim();
+        if (!newName) return;
+        
+        markData.circles[circleId].name = newName;
+        saveMarkData();
+        editingCircleId = null;
+        renderCircleFilters();
+        updateMarkUI(selectedNodeId);
+        invalidateGraph();
+        return;
+      }
+      
+      if (action === 'cancel') {
+        editingCircleId = null;
+        renderCircleSelect(selectedNodeId);
+        return;
+      }
+      
+      if (action === 'delete') {
+        if (!confirm(`Delete circle "${markData.circles[circleId].name}"?`)) return;
+        
+        Object.values(markData.circles).forEach(circle => {
+          if (!circle || !Array.isArray(circle.children)) return;
+          circle.children = circle.children.filter(childId => String(childId) !== String(circleId));
+        });
+        
+        Object.keys(markData.nodeToCircles).forEach(id => {
+          const list = markData.nodeToCircles[id];
+          if (!Array.isArray(list)) return;
+          const next = list.filter(c => c !== circleId);
+          if (next.length) {
+            markData.nodeToCircles[id] = next;
+          } else {
+            delete markData.nodeToCircles[id];
+          }
+        });
+        delete markData.circles[circleId];
+        saveMarkData();
+        renderCircleFilters();
+        updateMarkUI(selectedNodeId);
+        invalidateGraph();
+        return;
+      }
+
+      if (item && !action) {
+        if (target.tagName !== "INPUT" && target.tagName !== "BUTTON") {
+          focusedCircleId = circleId;
+          renderCircleSelect(selectedNodeId);
+        }
+      }
+    });
+
+    function clearCircleDropTargets() {
+      circleSelectList.querySelectorAll('.is-drop-target').forEach(el => el.classList.remove('is-drop-target'));
+    }
+
+    circleSelectList.addEventListener("dragstart", (event) => {
+      const item = event.target.closest('.select-item');
+      if (!item || !item.dataset.id) return;
+      if (editingCircleId || creatingCircle) return;
+      dragCircleId = item.dataset.id;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', dragCircleId);
+    });
+
+    circleSelectList.addEventListener("dragover", (event) => {
+      if (!dragCircleId) return;
+      const targetItem = event.target.closest('.select-item');
+      const rootDrop = event.target.closest('.tree-root-drop');
+      if (!targetItem && !rootDrop) return;
+      event.preventDefault();
+      clearCircleDropTargets();
+      if (targetItem) targetItem.classList.add('is-drop-target');
+      if (rootDrop) rootDrop.classList.add('is-drop-target');
+    });
+
+    circleSelectList.addEventListener("dragleave", (event) => {
+      const targetItem = event.target.closest('.select-item');
+      const rootDrop = event.target.closest('.tree-root-drop');
+      if (targetItem && !targetItem.contains(event.relatedTarget)) {
+        targetItem.classList.remove('is-drop-target');
+      }
+      if (rootDrop && !rootDrop.contains(event.relatedTarget)) {
+        rootDrop.classList.remove('is-drop-target');
+      }
+    });
+
+    circleSelectList.addEventListener("drop", (event) => {
+      if (!dragCircleId) return;
+      event.preventDefault();
+      const targetItem = event.target.closest('.select-item');
+      const rootDrop = event.target.closest('.tree-root-drop');
+      const targetId = targetItem ? targetItem.dataset.id : null;
+
+      const { parentById, childrenById } = buildCircleForest(markData.circles);
+      const descendants = getCircleDescendants(dragCircleId, childrenById);
+
+      if (rootDrop) {
+        setCircleParent(dragCircleId, null, parentById);
+      } else if (targetId && targetId !== dragCircleId && !descendants.has(targetId)) {
+        setCircleParent(dragCircleId, targetId, parentById);
+      }
+
+      dragCircleId = null;
+      clearCircleDropTargets();
+      saveMarkData();
+      renderCircleSelect(selectedNodeId);
+      renderCircleFilters();
+      invalidateGraph();
+    });
+
+    circleSelectList.addEventListener("dragend", () => {
+      dragCircleId = null;
+      clearCircleDropTargets();
+    });
+
+    circleSelectList.addEventListener("keydown", (event) => {
+      if (event.key === 'Enter') {
+        const target = event.target;
+        if (target.classList.contains('item-input')) {
+          const item = target.closest('.select-item');
+          const saveBtn = item.querySelector('[data-action="save"], [data-action="create"]');
+          if (saveBtn) saveBtn.click();
+        }
+      }
+      if (event.key === 'Escape') {
+        const target = event.target;
+        if (target.classList.contains('item-input')) {
+          const item = target.closest('.select-item');
+          const cancelBtn = item.querySelector('[data-action="cancel"], [data-action="cancel-create"]');
+          if (cancelBtn) cancelBtn.click();
+        }
+      }
+    });
+
+    circleSearch.addEventListener("input", () => {
+      renderCircleSelect(selectedNodeId);
+    });
+
+    function setupCollapse(sectionEl, toggleBtn, bodyEl) {
+      if (!sectionEl || !toggleBtn || !bodyEl) return;
+      toggleBtn.addEventListener("click", () => {
+        const isCollapsed = sectionEl.classList.toggle("is-collapsed");
+        const chevron = toggleBtn.querySelector(".chevron");
+        if (chevron) chevron.textContent = isCollapsed ? ">" : "v";
+      });
+    }
+
+    setupCollapse(groupSection, groupToggleBtn, groupSectionBody);
+    setupCollapse(circleSection, circleToggleBtn, circleSectionBody);
+
+    if (groupClearBtn) {
+      groupClearBtn.addEventListener("click", () => {
+        if (!selectedNodeId) return;
+        delete markData.nodeToGroup[String(selectedNodeId)];
+        saveMarkData();
+        updateMarkUI(selectedNodeId);
+        invalidateGraph();
+      });
+    }
+
+
+
+    fitBtn.addEventListener("click", () => {
+      if (network) network.fit({ animation: true });
+    });
+
+    function updatePhysicsToggle() {
+      physicsToggleBtn.textContent = manualPhysicsEnabled ? "停止物理" : "开始物理";
+    }
+
+    function stopPhysicsForFocus() {
+      if (!network) return;
+      if (manualPhysicsEnabled) {
+        manualPhysicsEnabled = false;
+        updatePhysicsToggle();
+      }
+      network.stopSimulation();
+      network.setOptions({ physics: { enabled: false } });
+    }
+
+    updatePhysicsToggle();
+
+    physicsToggleBtn.addEventListener("click", () => {
+      manualPhysicsEnabled = !manualPhysicsEnabled;
+      updatePhysicsToggle();
+      if (!network) return;
+      if (manualPhysicsEnabled) {
+        const graph = computeGraph(null);
+        if (!graph) return;
+        const { nodes, edges, isSingleSearch } = graph;
+        network.setOptions({ physics: getAdaptivePhysics(nodes.length, edges.length, isSingleSearch) });
+        network.startSimulation();
+      } else {
+        network.stopSimulation();
+        network.setOptions({ physics: { enabled: false } });
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.code !== "Space") return;
+      const target = event.target;
+      if (!target) return;
+      const tag = target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) return;
+      event.preventDefault();
+      physicsToggleBtn.click();
+    });
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function beginSplitterDrag(side) {
+      if (window.matchMedia("(max-width: 1200px)").matches) return;
+      isDraggingSplitter = true;
+      draggingSide = side;
+      document.body.style.cursor = "col-resize";
+    }
+
+    function endSplitterDrag() {
+      if (!isDraggingSplitter) return;
+      isDraggingSplitter = false;
+      draggingSide = null;
+      document.body.style.cursor = "";
+    }
+
+    function handleSplitterMove(event) {
+      if (!isDraggingSplitter) return;
+      const main = document.querySelector("main");
+      const rect = main.getBoundingClientRect();
+      const minLeft = 200;
+      const minRight = 260;
+      const maxLeft = rect.width - minRight - 80;
+      const maxRight = rect.width - minLeft - 80;
+
+      if (draggingSide === "left") {
+        const nextLeft = clamp(event.clientX - rect.left, minLeft, maxLeft);
+        document.documentElement.style.setProperty("--left-w", `${nextLeft}px`);
+      }
+
+      if (draggingSide === "right") {
+        const nextRight = clamp(rect.right - event.clientX, minRight, maxRight);
+        document.documentElement.style.setProperty("--right-w", `${nextRight}px`);
+      }
+    }
+
+    splitterLeft.addEventListener("mousedown", () => beginSplitterDrag("left"));
+    splitterRight.addEventListener("mousedown", () => beginSplitterDrag("right"));
+    window.addEventListener("mousemove", handleSplitterMove);
+    window.addEventListener("mouseup", endSplitterDrag);
+
+    function renderFilteredList(nodes) {
+      if (!nodes.length) {
+        filteredList.textContent = "没有匹配项";
+        return;
+      }
+
+      const sorted = [...nodes].sort((a, b) => {
+        const aName = a.label || "";
+        const bName = b.label || "";
+        return aName.localeCompare(bName);
+      });
+
+      filteredList.innerHTML = sorted.map(n => {
+        const label = safeText(n.label || n.id);
+        return `<div class="button" data-id="${n.id}" style="display:block;width:100%;text-align:left;margin-bottom:6px;">${label}</div>`;
+      }).join("");
+    }
+
+    function renderFixedList() {
+      const fixedIds = Array.from(pinnedNodes);
+      if (!fixedIds.length) {
+        fixedList.textContent = "没有固定成员";
+        return;
+      }
+
+      const sorted = fixedIds
+        .map(id => {
+          return { id: String(id), label: getMemberLabel(id) };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+      fixedList.innerHTML = sorted.map(n => {
+        return `<div class="button" data-id="${n.id}" style="display:block;width:100%;text-align:left;margin-bottom:6px;">${safeText(n.label)}</div>`;
+      }).join("");
+    }
+
+    function renderCircleFilters(circleToNodes = null) {
+      const { ordered, childrenById } = buildCircleForest(markData.circles);
+      const entries = ordered.map(({ id, depth }) => {
+        const circle = markData.circles[id] || { name: id };
+        return { id, name: circle.name || id, depth };
+      });
+
+      if (!entries.length) {
+        circleFilterList.textContent = "没有圈子";
+        circleFilterSelected = new Set();
+        return;
+      }
+
+      const directCounts = new Map();
+      if (circleToNodes) {
+        circleToNodes.forEach((nodes, id) => directCounts.set(String(id), nodes.length));
+      } else {
+        Object.entries(markData.nodeToCircles).forEach(([, list]) => {
+          if (!Array.isArray(list)) return;
+          list.forEach(id => directCounts.set(String(id), (directCounts.get(String(id)) || 0) + 1));
+        });
+      }
+
+      const totalCounts = new Map();
+      entries.forEach(entry => {
+        const descendants = getCircleDescendants(entry.id, childrenById);
+        let total = directCounts.get(String(entry.id)) || 0;
+        descendants.forEach(childId => {
+          total += directCounts.get(String(childId)) || 0;
+        });
+        totalCounts.set(entry.id, total);
+      });
+
+      circleFilterSelected = new Set([...circleFilterSelected].filter(id => entries.some(e => e.id === id)));
+
+      circleFilterList.innerHTML = entries.map(c => {
+        const total = totalCounts.get(c.id) || 0;
+        const direct = directCounts.get(String(c.id)) || 0;
+        const checked = circleFilterSelected.has(c.id) ? "checked" : "";
+        const branch = c.depth > 0 ? `${"| ".repeat(Math.min(6, c.depth) - 1)}|- ` : "";
+        return `<label class="circle-filter-item"><input type="checkbox" data-id="${c.id}" ${checked} /><span class="tree-branch">${branch}</span><span class="filter-dot"></span>${safeText(c.name)} <span class="muted" title="总计/直接">(${total}/${direct})</span></label>`;
+      }).join("");
+    }
+
+    filteredList.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!target || !target.dataset) return;
+      const id = target.dataset.id;
+      if (!id || !network) return;
+      stopPhysicsForFocus();
+      selectedNodeId = id;
+      network.selectNodes([id], false);
+      showDetail(id);
+      pendingViewAnchor = captureViewAnchor(selectedNodeId);
+      suppressAutoFit = true;
+      scheduleRender(false);
+    });
+
+    fixedList.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!target || !target.dataset) return;
+      const id = target.dataset.id;
+      if (!id || !network) return;
+      stopPhysicsForFocus();
+      selectedNodeId = id;
+      network.selectNodes([id], false);
+      showDetail(id);
+      pendingViewAnchor = captureViewAnchor(selectedNodeId);
+      suppressAutoFit = true;
+      scheduleRender(false);
+    });
+
+    circleFilterList.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!target || !target.dataset) return;
+      const id = target.dataset.id;
+      if (!id) return;
+      if (target.checked) {
+        circleFilterSelected.add(id);
+      } else {
+        circleFilterSelected.delete(id);
+      }
+      scheduleRender(true);
+    });
+
+    circleFilterEnabled.addEventListener("change", () => {
+      scheduleRender(true);
+    });
+
+    if (showCircleOverlay) {
+      showCircleOverlay.addEventListener("change", () => {
+        scheduleRender(false);
+      });
+    }
+  </script>
+</body>
+</html>
