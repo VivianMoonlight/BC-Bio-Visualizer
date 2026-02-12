@@ -1919,6 +1919,15 @@
 
       const allowedNodes = new Set();
 
+      const forcedCircleNodes = new Set();
+      if (circleFilterEnabled.checked && circleFilterSelected.size) {
+        const circleIds = getExpandedCircleFilterSet(circleFilterSelected);
+        circleIds.forEach(circleId => {
+          const members = circleToNodes.get(String(circleId)) || [];
+          members.forEach(id => forcedCircleNodes.add(id));
+        });
+      }
+
       allNodes.forEach(n => {
         const m = membersById.get(n.id);
         const name = safeText(m && m.name).toLowerCase();
@@ -1941,6 +1950,7 @@
           expandedAllowed.add(id);
         }
       });
+      forcedCircleNodes.forEach(id => expandedAllowed.add(id));
 
       const edgesAllowedByType = allEdges.filter(e => {
         if (e.dataType === "ownership" && !showO) return false;
@@ -1994,6 +2004,7 @@
         [...edges, ...groupEdges].forEach(e => { connected.add(e.from); connected.add(e.to); });
         pinnedNodes.forEach(id => connected.add(String(id)));
         if (selectedNodeId) connected.add(String(selectedNodeId));
+        forcedCircleNodes.forEach(id => connected.add(String(id)));
         nodes = nodes.filter(n => connected.has(n.id));
       }
 
