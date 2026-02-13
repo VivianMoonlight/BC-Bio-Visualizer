@@ -41,7 +41,7 @@
     STORE_NAME: 'profiles',
     STORAGE_KEY: 'bc-graph-viewer-marks',
     CACHE_DURATION: 5 * 60 * 1000, // 5 minutes
-    BUTTON_POSITION: { bottom: '20px', right: '20px' }
+    COMMAND_TAG: 'biovis'
   };
 
   // ============================================================================
@@ -328,48 +328,43 @@
   }
 
   // ============================================================================
-  // UI MODULE - FLOATING BUTTON
+  // UI MODULE - GAME COMMAND INJECTION
   // ============================================================================
 
   /**
-   * Create floating trigger button
+   * Wait for the BC game to be fully loaded (CommandCombine available)
    */
-  function createFloatingButton() {
-    const btn = document.createElement('button');
-    btn.id = 'bc-bio-visualizer-trigger';
-    btn.innerHTML = '📊 Bio';
-    btn.style.cssText = `
-      position: fixed;
-      bottom: ${CONFIG.BUTTON_POSITION.bottom};
-      right: ${CONFIG.BUTTON_POSITION.right};
-      z-index: 999998;
-      padding: 12px 20px;
-      background: linear-gradient(135deg, #ffb347, #ff3d77);
-      border: none;
-      border-radius: 12px;
-      color: white;
-      font-weight: bold;
-      font-size: 14px;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      transition: all 0.3s ease;
-      font-family: "Segoe UI", sans-serif;
-    `;
-    
-    btn.addEventListener('mouseenter', () => {
-      btn.style.transform = 'translateY(-2px)';
-      btn.style.boxShadow = '0 6px 16px rgba(255, 77, 119, 0.4)';
+  function waitForGameReady(maxAttempts = 100, interval = 500) {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const check = setInterval(() => {
+        attempts++;
+        if (typeof CommandCombine === 'function') {
+          clearInterval(check);
+          console.log('[BC-Bio-Visualizer] Game API ready after', attempts, 'attempts');
+          resolve();
+        } else if (attempts >= maxAttempts) {
+          clearInterval(check);
+          reject(new Error('Timeout waiting for game API (CommandCombine)'));
+        }
+      }, interval);
     });
-    
-    btn.addEventListener('mouseleave', () => {
-      btn.style.transform = 'translateY(0)';
-      btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-    });
-    
-    btn.addEventListener('click', toggleVisualizer);
-    
-    document.body.appendChild(btn);
-    return btn;
+  }
+
+  /**
+   * Register chat command to toggle the visualizer
+   */
+  function registerGameCommand() {
+    CommandCombine([
+      {
+        Tag: 'biovis',
+        Description: '[BC-Bio-Visualizer] Toggle the bio relationship visualizer',
+        Action: () => {
+          toggleVisualizer();
+        }
+      }
+    ]);
+    console.log('[BC-Bio-Visualizer] Chat command registered: /biovis');
   }
 
   // ============================================================================
@@ -4099,16 +4094,22 @@
       // Don't return - allow the UI to load, but graph won't work
     }
 
-    // Create floating button
-    createFloatingButton();
-
     // Create Shadow DOM container
     createShadowContainer();
 
     // Setup keyboard shortcuts
     setupKeyboardShortcuts();
 
-    console.log('[BC-Bio-Visualizer] 初始化完成！点击浮动按钮或按 Ctrl+Shift+V 打开');
+    // Wait for game API and register chat command
+    try {
+      await waitForGameReady();
+      registerGameCommand();
+    } catch (error) {
+      console.error('[BC-Bio-Visualizer] Failed to register game command:', error);
+      console.warn('[BC-Bio-Visualizer] /biovis command unavailable, use Ctrl+Shift+V instead');
+    }
+
+    console.log('[BC-Bio-Visualizer] 初始化完成！输入 /biovis 或按 Ctrl+Shift+V 打开');
   }
 
   // Wait for page to be ready
