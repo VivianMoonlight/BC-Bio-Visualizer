@@ -4207,6 +4207,17 @@
     sigParts.push(displayNickname && displayNickname.checked ? 'N' : 'n');
     sigParts.push(String(displayNodes.length));
     sigParts.push(String(edges.length + groupEdges.length + circleEdges.length));
+    // Include circle filter state so toggling filters invalidates the signature
+    sigParts.push(circleFilterEnabled && circleFilterEnabled.checked ? 'CF' : 'cf');
+    if (circleFilterSelected.size) {
+      const sorted = [...circleFilterSelected].sort();
+      let cfh = 0;
+      for (let i = 0; i < sorted.length; i++) {
+        const s = sorted[i];
+        for (let j = 0; j < s.length; j++) cfh = ((cfh << 5) - cfh + s.charCodeAt(j)) | 0;
+      }
+      sigParts.push(String(cfh));
+    }
     // Hash node IDs + their mark/pin state
     let nodeHash = 0;
     for (let i = 0; i < displayNodes.length; i++) {
