@@ -1850,6 +1850,7 @@
   let groupMembersByNode = new Map();
   let circleMembersByNode = new Map();
   let circleFilterSelected = new Set();
+  let isRerendering = false; // guard against setData-triggered deselect
 
   // Mark data structure
   const MARK_DATA_VERSION = 2;
@@ -2631,6 +2632,10 @@
     renderFilteredList(displayNodes);
     renderCircleFilters(circleToNodes);
 
+    // Save viewport position before re-render
+    const savedViewPosition = network ? network.getViewPosition() : null;
+    const savedScale = network ? network.getScale() : null;
+
     const data = {
       nodes: new vis.DataSet(nodes),
       edges: new vis.DataSet(edges)
@@ -2644,22 +2649,32 @@
         ? { enabled: true, solver: "barnesHut", stabilization: { iterations: 200, updateInterval: 20 }, barnesHut: { gravitationalConstant: -12000, springLength: 100, springConstant: 0.012, damping: 0.4 }, minVelocity: 1, maxVelocity: 30 }
         : { enabled: false };
       network.setOptions({ physics });
+      isRerendering = true;
       network.setData(data);
+      isRerendering = false;
+      // Re-select the node after setData (which clears selection)
+      if (selectedNodeId) {
+        network.selectNodes([selectedNodeId]);
+      }
     } else {
       const options = getNetworkOptions();
       network = new vis.Network(graphContainer, data, options);
       
-      // Node selection event
+      // Node selection event — re-render to show n-hop neighbors of selected node
       network.on("selectNode", params => {
+        if (isRerendering) return;
         const nodeId = params.nodes[0];
         selectedNodeId = nodeId;
         showDetail(nodeId);
+        invalidateGraph();
       });
 
-      // Node deselection event
+      // Node deselection event — re-render to remove expanded neighbors
       network.on("deselectNode", () => {
+        if (isRerendering) return;
         selectedNodeId = null;
         hideDetail();
+        invalidateGraph();
       });
 
       // Double-click to pin/unpin nodes
@@ -2682,8 +2697,18 @@
       console.log('[BC-Bio-Visualizer] Network initialized with pin support');
     }
 
-    // Auto-fit when node count changes
-    if (nodes.length && nodes.length !== lastVisibleNodeCount) {
+    // Restore viewport position if we had one, otherwise fit on first render
+    if (savedViewPosition && savedScale) {
+      requestAnimationFrame(() => {
+        if (network) {
+          network.moveTo({
+            position: savedViewPosition,
+            scale: savedScale,
+            animation: false
+          });
+        }
+      });
+    } else if (nodes.length && nodes.length !== lastVisibleNodeCount) {
       requestAnimationFrame(() => {
         if (network) network.fit({ animation: false });
       });
