@@ -2663,11 +2663,11 @@
       network.setOptions({ physics });
       isRerendering = true;
       network.setData(data);
-      isRerendering = false;
       // Re-select the node after setData (which clears selection)
       if (selectedNodeId) {
         network.selectNodes([selectedNodeId]);
       }
+      isRerendering = false;
     } else {
       const options = getNetworkOptions();
       network = new vis.Network(graphContainer, data, options);
@@ -2678,7 +2678,7 @@
         const nodeId = params.nodes[0];
         selectedNodeId = nodeId;
         showDetail(nodeId);
-        invalidateGraph();
+        applyFilters();
       });
 
       // Node deselection event — only deselect when switching to another node
