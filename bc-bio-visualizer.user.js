@@ -2411,6 +2411,7 @@
           return { ...n, label: `${name} (#${n.id})` };
         });
         currentGraphSignature = ''; // Force re-render
+        _indexDirty = true; // allNodes changed, invalidate cached indexes
         useIncrementalUpdate = true;
         applyFilters();
         useIncrementalUpdate = false;
@@ -2998,6 +2999,14 @@
   let currentEdgeDataSet = null;
   let lastRenderedSelectedNodeId = null;
 
+  // Performance: cached indexes and stats
+  let _cachedGroupIndex = null;   // { groupToNodes, nodeToGroup }
+  let _cachedCircleIndex = null;  // { circleToNodes }
+  let _indexDirty = true;         // set true when allNodes or markData changes
+  let _cachedEdgeStats = null;    // { ownership, lovership }
+  let _cachedNeighborMap = null;  // Map<string, string[]> for edge-based BFS
+  let _neighborMapEdgeSignature = ""; // invalidation key for neighbor map
+
   // Mobile panel state
   let mobileLeftOpen = false;
   let mobileRightOpen = false;
@@ -3172,30 +3181,114 @@
     });
   }
 
+  /**
+   * Combined single-pass node styling — merges group, highlight, circle filter, pinned
+   * Avoids 4 separate iterations and object spreads
+   */
+  function applyAllStyles(nodes, selectedId) {
+    const hasSelection = !!selectedId;
+    const groupMembers = hasSelection ? new Set(getGroupMembers(selectedId)) : null;
+    const multiGroup = groupMembers && groupMembers.size > 1;
+    const hasCircleFilter = (() => {
+      const el = shadowRoot.getElementById('circleFilterEnabled');
+      return el && el.checked && circleFilterSelected.size > 0;
+    })();
+    const expandedFilters = hasCircleFilter ? getExpandedCircleFilterSet(circleFilterSelected) : null;
+    const hasPinned = pinnedNodes.size > 0;
+
+    // Fast path: nothing to apply
+    if (!Object.keys(markData.nodeToGroup).length && !multiGroup && !hasCircleFilter && !hasPinned) {
+      return nodes;
+    }
+
+    return nodes.map(n => {
+      let modified = false;
+      let color = n.color;
+      let size = n.size;
+      let borderWidth = n.borderWidth;
+      let shadow = n.shadow;
+
+      // 1. Group style
+      const groupId = markData.nodeToGroup[n.id];
+      if (groupId) {
+        color = groupColor(groupId);
+        size = 10;
+        borderWidth = 2;
+        modified = true;
+      }
+
+      // 2. Group highlight (selected node's group members)
+      if (multiGroup && groupMembers.has(n.id) && String(n.id) !== String(selectedId)) {
+        const baseSize = Number.isFinite(size) ? size : 8;
+        const baseBorder = Number.isFinite(borderWidth) ? borderWidth : 1;
+        size = baseSize + 1;
+        borderWidth = baseBorder + 1;
+        shadow = { enabled: true, color: "rgba(43, 106, 122, 0.65)", size: 18, x: 0, y: 0 };
+        color = { border: "#2b6a7a", background: "#15242b" };
+        modified = true;
+      }
+
+      // 3. Circle filter highlight
+      if (expandedFilters) {
+        const circles = circleMembersByNode.get(n.id);
+        if (circles) {
+          for (let i = 0; i < circles.length; i++) {
+            if (expandedFilters.has(circles[i])) {
+              shadow = { enabled: true, color: "rgba(89, 165, 255, 0.55)", size: 16, x: 0, y: 0 };
+              modified = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 4. Pinned node style
+      if (hasPinned && pinnedNodes.has(n.id)) {
+        const baseColor = color || { border: "#2b3240", background: "#1f2430" };
+        borderWidth = (borderWidth || 1) + 2;
+        color = { ...baseColor, border: "#6ac9ff" };
+        shadow = { enabled: true, color: "rgba(106, 201, 255, 0.45)", size: 14, x: 0, y: 0 };
+        modified = true;
+      }
+
+      if (!modified) return n;
+      return { ...n, color, size, borderWidth, shadow };
+    });
+  }
+
   function buildGroupIndex(nodes) {
+    if (!_indexDirty && _cachedGroupIndex) return _cachedGroupIndex;
     const groupToNodes = new Map();
     const nodeToGroup = new Map();
-    nodes.forEach(n => {
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
       const groupId = markData.nodeToGroup[n.id];
-      if (!groupId) return;
-      if (!groupToNodes.has(groupId)) groupToNodes.set(groupId, []);
-      groupToNodes.get(groupId).push(n.id);
+      if (!groupId) continue;
+      let arr = groupToNodes.get(groupId);
+      if (!arr) { arr = []; groupToNodes.set(groupId, arr); }
+      arr.push(n.id);
       nodeToGroup.set(n.id, groupId);
-    });
-    return { groupToNodes, nodeToGroup };
+    }
+    _cachedGroupIndex = { groupToNodes, nodeToGroup };
+    return _cachedGroupIndex;
   }
 
   function buildCircleIndex(nodes) {
+    if (!_indexDirty && _cachedCircleIndex) return _cachedCircleIndex;
     const circleToNodes = new Map();
-    nodes.forEach(n => {
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
       const circleIds = markData.nodeToCircles[n.id];
-      if (!Array.isArray(circleIds)) return;
-      circleIds.forEach(id => {
-        if (!circleToNodes.has(id)) circleToNodes.set(id, []);
-        circleToNodes.get(id).push(n.id);
-      });
-    });
-    return { circleToNodes };
+      if (!Array.isArray(circleIds)) continue;
+      for (let j = 0; j < circleIds.length; j++) {
+        const id = circleIds[j];
+        let arr = circleToNodes.get(id);
+        if (!arr) { arr = []; circleToNodes.set(id, arr); }
+        arr.push(n.id);
+      }
+    }
+    _cachedCircleIndex = { circleToNodes };
+    return _cachedCircleIndex;
   }
 
   function buildCircleForest(circlesMap) {
@@ -3573,29 +3666,44 @@
   }
 
   /**
-   * Draw circle overlay on canvas
+   * Draw circle overlay on canvas (optimized: single batched getPositions call)
    */
   function drawCircleOverlay(ctx) {
     const showCircleOverlay = shadowRoot.getElementById('showCircleOverlay');
     if (!showCircleOverlay || !showCircleOverlay.checked || !circleOverlayEntries.length) return;
-    const scale = network ? network.getScale() : 1;
+    if (!network) return;
+    const scale = network.getScale();
     const lineBase = Math.max(1.1, 2.4 / scale);
     const blurBase = Math.max(6, 14 / scale);
 
+    // Batch: collect all unique node IDs across all entries
+    const allMemberSet = new Set();
+    for (let i = 0; i < circleOverlayEntries.length; i++) {
+      const members = circleOverlayEntries[i].members;
+      for (let j = 0; j < members.length; j++) allMemberSet.add(members[j]);
+    }
+    // Single getPositions call for all nodes
+    const allPositions = network.getPositions(Array.from(allMemberSet));
+
     ctx.save();
     ctx.globalCompositeOperation = "source-over";
-    circleOverlayEntries.forEach(entry => {
-      const positions = network.getPositions(entry.members);
-      const pts = Object.values(positions);
+    for (let i = 0; i < circleOverlayEntries.length; i++) {
+      const entry = circleOverlayEntries[i];
+      const pts = [];
+      for (let j = 0; j < entry.members.length; j++) {
+        const pos = allPositions[entry.members[j]];
+        if (pos) pts.push(pos);
+      }
+      if (pts.length < 2) continue;
       const padding = 28 + entry.depth * 10;
       const blur = blurBase + entry.depth * 1.6;
+      const width = lineBase + entry.depth * 0.35;
       if (pts.length === 2) {
-        drawCapsule(ctx, pts[0], pts[1], padding, entry.style, lineBase + entry.depth * 0.35, blur);
-        return;
+        drawCapsule(ctx, pts[0], pts[1], padding, entry.style, width, blur);
+      } else {
+        drawPaddedHull(ctx, pts, padding, entry.style, width, blur);
       }
-      if (pts.length < 3) return;
-      drawPaddedHull(ctx, pts, padding, entry.style, lineBase + entry.depth * 0.35, blur);
-    });
+    }
     ctx.restore();
   }
 
@@ -3624,27 +3732,45 @@
     return [id];
   }
 
+  /**
+   * Build or retrieve cached neighbor map from edges
+   */
+  function getNeighborMap(edges) {
+    // Build a simple signature from edge count + first/last edge IDs
+    const sig = edges.length + (edges.length ? ':' + edges[0].id + ':' + edges[edges.length - 1].id : '');
+    if (_cachedNeighborMap && _neighborMapEdgeSignature === sig) return _cachedNeighborMap;
+    const neighborMap = new Map();
+    for (let i = 0; i < edges.length; i++) {
+      const e = edges[i];
+      let fromArr = neighborMap.get(e.from);
+      if (!fromArr) { fromArr = []; neighborMap.set(e.from, fromArr); }
+      fromArr.push(e.to);
+      let toArr = neighborMap.get(e.to);
+      if (!toArr) { toArr = []; neighborMap.set(e.to, toArr); }
+      toArr.push(e.from);
+    }
+    _cachedNeighborMap = neighborMap;
+    _neighborMapEdgeSignature = sig;
+    return neighborMap;
+  }
+
   function expandByDepth(seedNodes, edges, depth) {
     const expanded = new Set(seedNodes);
     if (!seedNodes.size || depth <= 0) return expanded;
-    const neighborMap = new Map();
-    edges.forEach(e => {
-      if (!neighborMap.has(e.from)) neighborMap.set(e.from, []);
-      if (!neighborMap.has(e.to)) neighborMap.set(e.to, []);
-      neighborMap.get(e.from).push(e.to);
-      neighborMap.get(e.to).push(e.from);
-    });
+    const neighborMap = getNeighborMap(edges);
     let frontier = new Set(seedNodes);
     for (let step = 0; step < depth; step += 1) {
       const next = new Set();
       frontier.forEach(nodeId => {
-        const neighbors = neighborMap.get(nodeId) || [];
-        neighbors.forEach(n => {
+        const neighbors = neighborMap.get(nodeId);
+        if (!neighbors) return;
+        for (let i = 0; i < neighbors.length; i++) {
+          const n = neighbors[i];
           if (!expanded.has(n)) {
             expanded.add(n);
             next.add(n);
           }
-        });
+        }
       });
       if (!next.size) break;
       frontier = next;
@@ -3652,37 +3778,15 @@
     return expanded;
   }
 
+  // applyGroupHighlight and applyCircleFilterHighlight are now merged
+  // into applyAllStyles() for single-pass performance.
+  // Legacy wrappers retained for any external callers:
   function applyGroupHighlight(nodes, selectedId) {
-    if (!selectedId) return nodes;
-    const groupIds = new Set(getGroupMembers(selectedId));
-    if (groupIds.size <= 1) return nodes;
-    return nodes.map(n => {
-      if (!groupIds.has(n.id) || String(n.id) === String(selectedId)) return n;
-      const baseSize = Number.isFinite(n.size) ? n.size : 8;
-      const baseBorder = Number.isFinite(n.borderWidth) ? n.borderWidth : 1;
-      return {
-        ...n,
-        size: baseSize + 1,
-        borderWidth: baseBorder + 1,
-        shadow: { enabled: true, color: "rgba(43, 106, 122, 0.65)", size: 18, x: 0, y: 0 },
-        color: { border: "#2b6a7a", background: "#15242b" }
-      };
-    });
+    return nodes; // handled by applyAllStyles
   }
 
   function applyCircleFilterHighlight(nodes) {
-    const circleFilterEnabled = shadowRoot.getElementById('circleFilterEnabled');
-    if (!circleFilterEnabled || !circleFilterEnabled.checked || circleFilterSelected.size === 0) return nodes;
-    const expandedFilters = getExpandedCircleFilterSet(circleFilterSelected);
-    return nodes.map(n => {
-      const circles = circleMembersByNode.get(n.id) || [];
-      const isInSelected = circles.some(id => expandedFilters.has(id));
-      if (!isInSelected) return n;
-      return {
-        ...n,
-        shadow: { enabled: true, color: "rgba(89, 165, 255, 0.55)", size: 16, x: 0, y: 0 }
-      };
-    });
+    return nodes; // handled by applyAllStyles
   }
 
   function renderCircleFilters(circleToNodes) {
@@ -3731,6 +3835,7 @@
    */
   function invalidateGraph() {
     currentGraphSignature = "";
+    _indexDirty = true;
     applyFilters();
   }
 
@@ -3811,6 +3916,16 @@
 
     allNodes = nodes;
     allEdges = edges;
+    _indexDirty = true;
+    _cachedNeighborMap = null;
+
+    // Cache edge stats for fast lookup
+    let ownershipCount = 0, lovershipCount = 0;
+    for (let i = 0; i < edges.length; i++) {
+      if (edges[i].dataType === "ownership") ownershipCount++;
+      else if (edges[i].dataType === "lovership") lovershipCount++;
+    }
+    _cachedEdgeStats = { ownership: ownershipCount, lovership: lovershipCount };
 
     // Update stats
     const statMembers = shadowRoot.getElementById('statMembers');
@@ -3818,8 +3933,8 @@
     const statLovership = shadowRoot.getElementById('statLovership');
     
     if (statMembers) statMembers.textContent = nodes.length;
-    if (statOwnership) statOwnership.textContent = edges.filter(e => e.dataType === "ownership").length;
-    if (statLovership) statLovership.textContent = edges.filter(e => e.dataType === "lovership").length;
+    if (statOwnership) statOwnership.textContent = ownershipCount;
+    if (statLovership) statLovership.textContent = lovershipCount;
 
     // Update title filter
     const titleFilter = shadowRoot.getElementById('titleFilter');
@@ -3885,17 +4000,23 @@
     const { groupToNodes, nodeToGroup } = buildGroupIndex(allNodes);
     const { circleToNodes } = buildCircleIndex(allNodes);
 
-    groupMembersByNode = new Map();
-    groupToNodes.forEach((nodes, groupId) => {
-      nodes.forEach(id => groupMembersByNode.set(id, [...nodes]));
-    });
-    circleMembersByNode = new Map();
-    circleToNodes.forEach((nodes, circleId) => {
-      nodes.forEach(id => {
-        if (!circleMembersByNode.has(id)) circleMembersByNode.set(id, []);
-        circleMembersByNode.get(id).push(circleId);
+    // Only rebuild member lookup maps when indexes changed
+    if (_indexDirty) {
+      groupMembersByNode = new Map();
+      groupToNodes.forEach((nodes, groupId) => {
+        for (let i = 0; i < nodes.length; i++) groupMembersByNode.set(nodes[i], nodes);
       });
-    });
+      circleMembersByNode = new Map();
+      circleToNodes.forEach((nodeList, circleId) => {
+        for (let i = 0; i < nodeList.length; i++) {
+          const id = nodeList[i];
+          let arr = circleMembersByNode.get(id);
+          if (!arr) { arr = []; circleMembersByNode.set(id, arr); }
+          arr.push(circleId);
+        }
+      });
+      _indexDirty = false;
+    }
 
     const allowedNodes = new Set();
 
@@ -3965,18 +4086,19 @@
     let edges = edgesAllowedByType.filter(e => groupExpanded.has(e.from) && groupExpanded.has(e.to));
     let nodes = allNodes.filter(n => groupExpanded.has(n.id));
 
-    // Create virtual group edges
+    // Create virtual group edges — use Set for O(1) visibility check
+    const visibleNodeSet = new Set();
+    for (let i = 0; i < nodes.length; i++) visibleNodeSet.add(nodes[i].id);
     const groupEdges = [];
     groupToNodes.forEach((members, groupId) => {
-      const visibleMembers = members.filter(id => nodes.some(n => n.id === id));
-      if (visibleMembers.length < 2) return;
-      const anchor = visibleMembers[0];
-      for (let i = 1; i < visibleMembers.length; i += 1) {
-        const target = visibleMembers[i];
+      let firstVisible = -1;
+      for (let i = 0; i < members.length; i++) {
+        if (!visibleNodeSet.has(members[i])) continue;
+        if (firstVisible === -1) { firstVisible = i; continue; }
         groupEdges.push({
-          id: `g-${groupId}-${anchor}-${target}`,
-          from: anchor,
-          to: target,
+          id: `g-${groupId}-${members[firstVisible]}-${members[i]}`,
+          from: members[firstVisible],
+          to: members[i],
           dataType: "group",
           color: { color: "rgba(106, 201, 255, 0.45)" },
           width: 1.2,
@@ -3990,22 +4112,17 @@
     // Hide isolated nodes
     if (hideIso) {
       const connected = new Set();
-      [...edges, ...groupEdges].forEach(e => { connected.add(e.from); connected.add(e.to); });
+      for (let i = 0; i < edges.length; i++) { connected.add(edges[i].from); connected.add(edges[i].to); }
+      for (let i = 0; i < groupEdges.length; i++) { connected.add(groupEdges[i].from); connected.add(groupEdges[i].to); }
       pinnedNodes.forEach(id => connected.add(String(id)));
       if (selectedNodeId) connected.add(String(selectedNodeId));
       forcedCircleNodes.forEach(id => connected.add(String(id)));
       nodes = nodes.filter(n => connected.has(n.id));
     }
 
-    // Preserve positions from previous layout
+    // Preserve positions from previous layout — reuse cached neighbor map
     if (positionMap) {
-      const neighborMap = new Map();
-      edges.forEach(e => {
-        if (!neighborMap.has(e.from)) neighborMap.set(e.from, []);
-        if (!neighborMap.has(e.to)) neighborMap.set(e.to, []);
-        neighborMap.get(e.from).push(e.to);
-        neighborMap.get(e.to).push(e.from);
-      });
+      const neighborMap = getNeighborMap(edges);
 
       nodes = nodes.map(n => {
         const pos = positionMap[n.id];
@@ -4013,24 +4130,26 @@
           return { ...n, x: pos.x, y: pos.y, fixed: false };
         }
 
-        const neighbors = neighborMap.get(n.id) || [];
-        const neighborPositions = neighbors.map(id => positionMap[id]).filter(Boolean);
-        if (neighborPositions.length) {
-          const avg = neighborPositions.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
-          const x = avg.x / neighborPositions.length;
-          const y = avg.y / neighborPositions.length;
-          return { ...n, x: x + hashOffset(n.id) * 6, y: y + hashOffset(n.id, 7) * 6, fixed: false };
+        const neighbors = neighborMap.get(n.id);
+        if (neighbors) {
+          let sumX = 0, sumY = 0, count = 0;
+          for (let i = 0; i < neighbors.length; i++) {
+            const np = positionMap[neighbors[i]];
+            if (np) { sumX += np.x; sumY += np.y; count++; }
+          }
+          if (count) {
+            const x = sumX / count;
+            const y = sumY / count;
+            return { ...n, x: x + hashOffset(n.id) * 6, y: y + hashOffset(n.id, 7) * 6, fixed: false };
+          }
         }
 
         return { ...n, x: hashOffset(n.id, 13) * 50, y: hashOffset(n.id, 29) * 50, fixed: false };
       });
     }
 
-    // Apply styles
-    nodes = applyGroupStyle(nodes);
-    nodes = applyGroupHighlight(nodes, selectedNodeId);
-    nodes = applyCircleFilterHighlight(nodes);
-    nodes = applyPinnedNodes(nodes);
+    // Apply all styles in a single pass for performance
+    nodes = applyAllStyles(nodes, selectedNodeId);
 
     const displayNodes = nodes;
 
@@ -4083,16 +4202,62 @@
 
     const graphNodes = [...displayNodes, ...circleHubNodes];
 
-    const signature = JSON.stringify({
-      nodes: displayNodes.map(n => `${n.id}:${markData.nodeToGroup[n.id] || ""}:${(markData.nodeToCircles[n.id] || []).join(",")}:${pinnedNodes.has(n.id) ? "p" : ""}`),
-      edges: [...edges.map(e => e.id), ...groupEdges.map(e => e.id), ...circleEdges.map(e => e.id)],
-      display: displayNickname && displayNickname.checked ? "nick" : "name"
-    });
+    // Fast signature using simple hash instead of full JSON.stringify
+    const sigParts = [];
+    sigParts.push(displayNickname && displayNickname.checked ? 'N' : 'n');
+    sigParts.push(String(displayNodes.length));
+    sigParts.push(String(edges.length + groupEdges.length + circleEdges.length));
+    // Hash node IDs + their mark/pin state
+    let nodeHash = 0;
+    for (let i = 0; i < displayNodes.length; i++) {
+      const n = displayNodes[i];
+      const id = n.id;
+      let h = 0;
+      for (let j = 0; j < id.length; j++) h = ((h << 5) - h + id.charCodeAt(j)) | 0;
+      const gid = markData.nodeToGroup[id];
+      if (gid) for (let j = 0; j < gid.length; j++) h = ((h << 5) - h + gid.charCodeAt(j)) | 0;
+      const cids = markData.nodeToCircles[id];
+      if (cids) for (let j = 0; j < cids.length; j++) { const c = String(cids[j]); for (let k = 0; k < c.length; k++) h = ((h << 5) - h + c.charCodeAt(k)) | 0; }
+      if (pinnedNodes.has(id)) h = ((h << 5) - h + 112) | 0; // 'p'
+      nodeHash = (nodeHash + h) | 0;
+    }
+    // Hash edge IDs
+    let edgeHash = 0;
+    const allSigEdges = edges;
+    for (let i = 0; i < allSigEdges.length; i++) {
+      const eid = allSigEdges[i].id;
+      let h = 0;
+      for (let j = 0; j < eid.length; j++) h = ((h << 5) - h + eid.charCodeAt(j)) | 0;
+      edgeHash = (edgeHash + h) | 0;
+    }
+    for (let i = 0; i < groupEdges.length; i++) {
+      const eid = groupEdges[i].id;
+      let h = 0;
+      for (let j = 0; j < eid.length; j++) h = ((h << 5) - h + eid.charCodeAt(j)) | 0;
+      edgeHash = (edgeHash + h) | 0;
+    }
+    for (let i = 0; i < circleEdges.length; i++) {
+      const eid = circleEdges[i].id;
+      let h = 0;
+      for (let j = 0; j < eid.length; j++) h = ((h << 5) - h + eid.charCodeAt(j)) | 0;
+      edgeHash = (edgeHash + h) | 0;
+    }
+    sigParts.push(String(nodeHash));
+    sigParts.push(String(edgeHash));
+    const signature = sigParts.join('|');
+
+    // Concatenate edge arrays — avoid spread for large arrays
+    let mergedEdges;
+    if (groupEdges.length === 0 && circleEdges.length === 0) {
+      mergedEdges = edges;
+    } else {
+      mergedEdges = edges.concat(groupEdges, circleEdges);
+    }
 
     return {
       nodes: graphNodes,
       displayNodes,
-      edges: [...edges, ...groupEdges, ...circleEdges],
+      edges: mergedEdges,
       signature,
       circleToNodes
     };
@@ -4392,8 +4557,21 @@
     const statLovership = shadowRoot.getElementById('statLovership');
 
     if (statMembers) statMembers.textContent = rawMembers.length;
-    if (statOwnership) statOwnership.textContent = allEdges.filter(e => e.dataType === 'ownership').length;
-    if (statLovership) statLovership.textContent = allEdges.filter(e => e.dataType === 'lovership').length;
+    // Use cached edge stats instead of filtering every time
+    if (_cachedEdgeStats) {
+      if (statOwnership) statOwnership.textContent = _cachedEdgeStats.ownership;
+      if (statLovership) statLovership.textContent = _cachedEdgeStats.lovership;
+    } else {
+      // Fallback: count once and cache
+      let oc = 0, lc = 0;
+      for (let i = 0; i < allEdges.length; i++) {
+        if (allEdges[i].dataType === 'ownership') oc++;
+        else if (allEdges[i].dataType === 'lovership') lc++;
+      }
+      _cachedEdgeStats = { ownership: oc, lovership: lc };
+      if (statOwnership) statOwnership.textContent = oc;
+      if (statLovership) statLovership.textContent = lc;
+    }
   }
 
   /**
