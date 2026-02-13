@@ -271,6 +271,82 @@
   }
 
   /**
+   * Merge imported profiles into IndexedDB (put semantics: insert or update)
+   * For existing profiles, keep the one with the newer `seen` timestamp.
+   * @param {string} dbName
+   * @param {string} storeName
+   * @param {Array} records - Profile records to merge
+   * @param {Function} progressCallback - Optional progress callback
+   * @returns {Promise<{added: number, updated: number, skipped: number}>}
+   */
+  function mergeProfilesIntoStore(dbName, storeName, records, progressCallback = null) {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(dbName);
+      req.onerror = () => reject(req.error);
+      req.onsuccess = () => {
+        const db = req.result;
+        // First, read all existing records to compare timestamps
+        const readTx = db.transaction([storeName], 'readonly');
+        const readStore = readTx.objectStore(storeName);
+        const existingMap = new Map();
+
+        readStore.openCursor().onsuccess = e => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const row = cursor.value;
+            if (row.memberNumber !== undefined && row.memberNumber !== null) {
+              existingMap.set(String(row.memberNumber), row);
+            }
+            cursor.continue();
+          } else {
+            // Read complete, now write merged data
+            const writeTx = db.transaction([storeName], 'readwrite');
+            const writeStore = writeTx.objectStore(storeName);
+            let added = 0, updated = 0, skipped = 0;
+
+            records.forEach((record, index) => {
+              if (progressCallback && index % 100 === 0) {
+                progressCallback(`合并中... ${index}/${records.length}`);
+              }
+              const key = String(record.memberNumber);
+              const existing = existingMap.get(key);
+
+              if (!existing) {
+                // New record
+                writeStore.put(record);
+                added++;
+              } else {
+                // Compare seen timestamps, keep newer
+                const existingSeen = existing.seen || 0;
+                const importedSeen = record.seen || 0;
+                if (importedSeen > existingSeen) {
+                  writeStore.put(record);
+                  updated++;
+                } else {
+                  skipped++;
+                }
+              }
+            });
+
+            writeTx.oncomplete = () => {
+              db.close();
+              resolve({ added, updated, skipped });
+            };
+            writeTx.onerror = () => {
+              db.close();
+              reject(writeTx.error);
+            };
+          }
+        };
+        readTx.onerror = () => {
+          db.close();
+          reject(readTx.error);
+        };
+      };
+    });
+  }
+
+  /**
    * Extract data from IndexedDB
    * @param {Function} progressCallback - Optional progress callback
    * @returns {Promise<Array>} Simplified profile data
@@ -1275,6 +1351,8 @@
           <button class="button button-accent" id="extractBtn">提取数据</button>
           <button class="button" id="exportMarksBtn">导出分组</button>
           <button class="button" id="importMarksBtn">导入分组</button>
+          <button class="button" id="exportProfilesBtn" title="导出IndexedDB中的全部profiles原始数据">导出档案</button>
+          <button class="button" id="importProfilesBtn" title="导入profiles数据并与现有数据合并（保留更新的记录）">导入档案</button>
           <button class="button button-accent" id="physicsToggleBtn" title="切换物理（空格）">开始物理</button>
           <button class="button" id="fitBtn">适配</button>
           <button class="button button-close" id="closeBtn">关闭</button>
@@ -1452,6 +1530,8 @@
     const fileStatus = shadowRoot.getElementById('file-status');
     const exportMarksBtn = shadowRoot.getElementById('exportMarksBtn');
     const importMarksBtn = shadowRoot.getElementById('importMarksBtn');
+    const exportProfilesBtn = shadowRoot.getElementById('exportProfilesBtn');
+    const importProfilesBtn = shadowRoot.getElementById('importProfilesBtn');
     const searchInput = shadowRoot.getElementById('search');
     const displayNickname = shadowRoot.getElementById('displayNickname');
     const titleFilter = shadowRoot.getElementById('titleFilter');
@@ -1622,6 +1702,108 @@
         fileInput.remove();
       });
       
+      document.body.appendChild(fileInput);
+      fileInput.click();
+    });
+
+    // Export profiles data
+    exportProfilesBtn.addEventListener('click', async () => {
+      try {
+        showToast('正在读取档案数据...', 'info', 2000);
+        const raw = await readAllFromStore(CONFIG.DB_NAME, CONFIG.STORE_NAME);
+        if (raw.length === 0) {
+          showToast('没有档案数据可导出', 'error');
+          return;
+        }
+        const payload = {
+          type: 'bc-bio-profiles',
+          version: 1,
+          exportDate: new Date().toISOString(),
+          count: raw.length,
+          profiles: raw
+        };
+        const json = JSON.stringify(payload);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        a.download = `bc-profiles-${raw.length}records-${timestamp}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        console.log(`[BC-Bio-Visualizer] Profiles exported: ${raw.length} records`);
+        showToast(`导出成功！共 ${raw.length} 条档案记录`, 'success');
+      } catch (error) {
+        console.error('[BC-Bio-Visualizer] Profiles export error:', error);
+        showToast('档案导出失败: ' + error.message, 'error');
+      }
+    });
+
+    // Import profiles data
+    importProfilesBtn.addEventListener('click', () => {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.json';
+      fileInput.style.display = 'none';
+
+      fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        try {
+          showToast('正在读取文件...', 'info', 2000);
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+
+          // Validate data format
+          let profiles;
+          if (parsed.type === 'bc-bio-profiles' && Array.isArray(parsed.profiles)) {
+            profiles = parsed.profiles;
+          } else if (Array.isArray(parsed)) {
+            // Support raw array format
+            profiles = parsed;
+          } else {
+            showToast('无效的档案数据格式', 'error');
+            fileInput.remove();
+            return;
+          }
+
+          // Validate records have memberNumber
+          const validProfiles = profiles.filter(p => p.memberNumber !== undefined && p.memberNumber !== null);
+          if (validProfiles.length === 0) {
+            showToast('文件中没有有效的档案记录', 'error');
+            fileInput.remove();
+            return;
+          }
+
+          console.log(`[BC-Bio-Visualizer] Importing ${validProfiles.length} profiles (from ${profiles.length} total)...`);
+          showToast(`正在合并 ${validProfiles.length} 条档案记录...`, 'info', 3000);
+
+          const result = await mergeProfilesIntoStore(
+            CONFIG.DB_NAME,
+            CONFIG.STORE_NAME,
+            validProfiles,
+            (msg) => console.log('[BC-Bio-Visualizer]', msg)
+          );
+
+          // Invalidate cache so next extract picks up new data
+          cachedData = null;
+          cacheTimestamp = null;
+
+          console.log('[BC-Bio-Visualizer] Profiles import completed:', result);
+          showToast(
+            `导入完成！新增 ${result.added}，更新 ${result.updated}，跳过 ${result.skipped} 条记录`,
+            'success',
+            5000
+          );
+        } catch (error) {
+          console.error('[BC-Bio-Visualizer] Profiles import error:', error);
+          showToast('档案导入失败: ' + error.message, 'error');
+        }
+
+        fileInput.remove();
+      });
+
       document.body.appendChild(fileInput);
       fileInput.click();
     });
