@@ -4378,6 +4378,16 @@
       currentGraphSignature = signature;
       renderFilteredList(displayNodes);
       renderCircleFilters(circleToNodes);
+
+      // Rebuild circle overlay entries so drawPaddedHull reflects current membership
+      const incVisibleNodeIds = new Set(displayNodes.map(n => n.id));
+      const incCircleFilterEnabled = shadowRoot.getElementById('circleFilterEnabled');
+      const incAllowedCircleIds = incCircleFilterEnabled && incCircleFilterEnabled.checked && circleFilterSelected.size > 0
+        ? getExpandedCircleFilterSet(circleFilterSelected)
+        : null;
+      circleOverlayEntries = buildCircleOverlayEntries(incVisibleNodeIds, circleToNodes, incAllowedCircleIds);
+      network.redraw();
+
       updateStatistics();
       return;
     }
