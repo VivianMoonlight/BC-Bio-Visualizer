@@ -5,7 +5,7 @@
 // @description  WCE生物数据库可视化工具 (Tampermonkey集成版)
 // @author       BC-Bio-Visualizer Team
 // @match        https://www.bondageprojects.com/*
-// @match        https://bondageprojects.elementfx.com/*
+// @match        https://www.bondageprojects.elementfx.com/*
 // @icon         data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='%236ac9ff'/%3E%3C/svg%3E
 // @grant        GM_setValue
 // @grant        GM_getValue

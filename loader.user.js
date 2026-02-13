@@ -5,7 +5,7 @@
 // @description  WCE生物数据库可视化工具 - Loader
 // @author       BC-Bio-Visualizer Team
 // @match        https://www.bondageprojects.com/*
-// @match        https://bondageprojects.elementfx.com/*
+// @match        https://www.bondageprojects.elementfx.com/*
 // @match        https://www.bondage-europe.com/*
 // @match        https://www.bondage-asia.com/*
 // @match        http://localhost:*/*
