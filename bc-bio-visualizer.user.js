@@ -21,6 +21,18 @@
   'use strict';
 
   // ============================================================================
+  // COMPATIBILITY CHECK
+  // ============================================================================
+
+  // Check if we're running in a proper userscript environment
+  const hasGMSupport = typeof GM_getValue !== 'undefined' && 
+                       typeof GM_setValue !== 'undefined';
+  
+  if (!hasGMSupport) {
+    console.warn('[BC-Bio-Visualizer] Greasemonkey/Tampermonkey API not detected, using fallback storage');
+  }
+
+  // ============================================================================
   // CONSTANTS & CONFIGURATION
   // ============================================================================
 
@@ -93,6 +105,12 @@
   const Storage = {
     async get(key, defaultValue = null) {
       try {
+        // Check if GM_getValue is available
+        if (typeof GM_getValue === 'undefined') {
+          console.warn('[BC-Bio-Visualizer] GM_getValue not available, using localStorage fallback');
+          const value = localStorage.getItem(key);
+          return value !== null ? JSON.parse(value) : defaultValue;
+        }
         const value = await GM_getValue(key);
         return value !== undefined ? value : defaultValue;
       } catch (error) {
@@ -103,6 +121,12 @@
 
     async set(key, value) {
       try {
+        // Check if GM_setValue is available
+        if (typeof GM_setValue === 'undefined') {
+          console.warn('[BC-Bio-Visualizer] GM_setValue not available, using localStorage fallback');
+          localStorage.setItem(key, JSON.stringify(value));
+          return true;
+        }
         await GM_setValue(key, value);
         return true;
       } catch (error) {
@@ -113,6 +137,12 @@
 
     async remove(key) {
       try {
+        // Check if GM_deleteValue is available
+        if (typeof GM_deleteValue === 'undefined') {
+          console.warn('[BC-Bio-Visualizer] GM_deleteValue not available, using localStorage fallback');
+          localStorage.removeItem(key);
+          return true;
+        }
         await GM_deleteValue(key);
         return true;
       } catch (error) {
@@ -2048,11 +2078,18 @@
   }
 
   /**
+   * Check if vis-network library is loaded
+   */
+  function isVisNetworkReady() {
+    return typeof vis !== 'undefined' && vis.Network;
+  }
+
+  /**
    * Compute graph based on filters (Phase 5 - with pinned nodes)
    */
   function computeGraph(positionMap) {
-    if (!window.vis || !window.vis.Network) {
-      console.error('[BC-Bio-Visualizer] vis-network not loaded');
+    if (!isVisNetworkReady()) {
+      console.error('[BC-Bio-Visualizer] vis-network not loaded yet');
       return null;
     }
 
@@ -2564,9 +2601,31 @@
   // ============================================================================
 
   /**
+   * Wait for vis-network library to be loaded
+   */
+  function waitForVisNetwork(maxAttempts = 20, interval = 100) {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      
+      const checkInterval = setInterval(() => {
+        attempts++;
+        
+        if (isVisNetworkReady()) {
+          clearInterval(checkInterval);
+          console.log('[BC-Bio-Visualizer] vis-network loaded successfully');
+          resolve();
+        } else if (attempts >= maxAttempts) {
+          clearInterval(checkInterval);
+          reject(new Error('vis-network failed to load after ' + maxAttempts + ' attempts'));
+        }
+      }, interval);
+    });
+  }
+
+  /**
    * Main initialization function
    */
-  function main() {
+  async function main() {
     console.log('[BC-Bio-Visualizer] v2.0.0 启动中...');
 
     // Check required features
@@ -2578,6 +2637,14 @@
     if (!document.body.attachShadow) {
       console.warn('[BC-Bio-Visualizer] Shadow DOM not supported, using fallback');
       // TODO: Implement fallback in later phase
+    }
+
+    // Wait for vis-network to be loaded
+    try {
+      await waitForVisNetwork();
+    } catch (error) {
+      console.error('[BC-Bio-Visualizer] Failed to load vis-network:', error);
+      return;
     }
 
     // Create floating button
