@@ -1519,8 +1519,23 @@
     // Export marks
     exportMarksBtn.addEventListener('click', async () => {
       try {
+        // Calculate statistics
+        const groupCount = Object.keys(markData.groups).length;
+        const circleCount = Object.keys(markData.circles).length;
+        const markedNodeCount = Object.keys(markData.nodeToGroup).length;
+        const circleNodeCount = Object.keys(markData.nodeToCircles).length;
+        const pinnedNodeCount = pinnedNodes.size;
+
         const payload = {
           version: MARK_DATA_VERSION,
+          exportDate: new Date().toISOString(),
+          statistics: {
+            groups: groupCount,
+            circles: circleCount,
+            markedNodes: markedNodeCount,
+            circleNodes: circleNodeCount,
+            pinnedNodes: pinnedNodeCount
+          },
           nodeToGroup: markData.nodeToGroup,
           groups: markData.groups,
           nodeToCircles: markData.nodeToCircles,
@@ -1532,11 +1547,12 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `bc-marks-export-${Date.now()}.json`;
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        a.download = `bc-marks-${groupCount}groups-${circleCount}circles-${timestamp}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        console.log('[BC-Bio-Visualizer] Marks exported');
-        showToast('分组数据导出成功！', 'success');
+        console.log('[BC-Bio-Visualizer] Marks exported:', payload.statistics);
+        showToast(`导出成功！${groupCount}个分组、${circleCount}个社交圈`, 'success');
       } catch (error) {
         console.error('[BC-Bio-Visualizer] Export error:', error);
         showToast('导出失败: ' + error.message, 'error');
@@ -1560,14 +1576,30 @@
           const parsed = JSON.parse(text);
           const normalized = normalizeMarkData(parsed);
           
+          // Count items being imported
+          const importGroupCount = Object.keys(normalized.groups).length;
+          const importCircleCount = Object.keys(normalized.circles).length;
+          const importMarkedNodes = Object.keys(normalized.nodeToGroup).length;
+          const importCircleNodes = Object.keys(normalized.nodeToCircles).length;
+          const importPinnedNodes = normalized.pinnedNodes.length;
+          
+          console.log('[BC-Bio-Visualizer] Importing:', {
+            groups: importGroupCount,
+            circles: importCircleCount,
+            markedNodes: importMarkedNodes,
+            circleNodes: importCircleNodes,
+            pinnedNodes: importPinnedNodes,
+            version: normalized.version,
+            exportDate: parsed.exportDate || 'unknown'
+          });
+          
           // Merge with existing data
           markData.nodeToGroup = { ...markData.nodeToGroup, ...normalized.nodeToGroup };
           markData.groups = { ...markData.groups, ...normalized.groups };
           markData.nodeToCircles = { ...markData.nodeToCircles, ...normalized.nodeToCircles };
           markData.circles = { ...markData.circles, ...normalized.circles };
           
-          // Restore pinned nodes
-          pinnedNodes.clear();
+          // Merge pinned nodes (consistent with other data merging)
           if (Array.isArray(normalized.pinnedNodes)) {
             normalized.pinnedNodes.forEach(id => pinnedNodes.add(String(id)));
           }
@@ -1579,8 +1611,8 @@
           invalidateGraph();
           useIncrementalUpdate = false;
           
-          console.log('[BC-Bio-Visualizer] Marks imported successfully');
-          showToast('分组数据导入成功！', 'success');
+          console.log('[BC-Bio-Visualizer] Import completed successfully');
+          showToast(`导入成功！${importGroupCount}个分组、${importCircleCount}个社交圈已合并`, 'success', 4000);
         } catch (error) {
           console.error('[BC-Bio-Visualizer] Import error:', error);
           showToast('导入失败: ' + error.message, 'error');
@@ -1860,7 +1892,9 @@
         saveMarkData();
         renderCircleFilters();
         updateMarkUI(selectedNodeId);
+        useIncrementalUpdate = true;
         invalidateGraph();
+        useIncrementalUpdate = false;
       });
 
       // Button clicks - CRUD operations
@@ -1891,7 +1925,9 @@
           creatingCircle = false;
           renderCircleFilters();
           updateMarkUI(selectedNodeId);
+          useIncrementalUpdate = true;
           invalidateGraph();
+          useIncrementalUpdate = false;
           return;
         }
         
@@ -1920,7 +1956,9 @@
           editingCircleId = null;
           renderCircleFilters();
           updateMarkUI(selectedNodeId);
+          useIncrementalUpdate = true;
           invalidateGraph();
+          useIncrementalUpdate = false;
           return;
         }
         
@@ -1952,7 +1990,9 @@
           saveMarkData();
           renderCircleFilters();
           updateMarkUI(selectedNodeId);
+          useIncrementalUpdate = true;
           invalidateGraph();
+          useIncrementalUpdate = false;
           return;
         }
 
@@ -2021,7 +2061,9 @@
         saveMarkData();
         renderCircleSelect(selectedNodeId);
         renderCircleFilters();
+        useIncrementalUpdate = true;
         invalidateGraph();
+        useIncrementalUpdate = false;
       });
 
       circleSelectList.addEventListener("dragend", () => {
@@ -2085,7 +2127,9 @@
         delete markData.nodeToGroup[String(selectedNodeId)];
         saveMarkData();
         updateMarkUI(selectedNodeId);
+        useIncrementalUpdate = true;
         invalidateGraph();
+        useIncrementalUpdate = false;
       });
     }
 
