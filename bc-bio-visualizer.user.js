@@ -1670,6 +1670,14 @@
       });
     }
 
+    // Circle overlay toggle
+    const showCircleOverlay = shadowRoot.getElementById('showCircleOverlay');
+    if (showCircleOverlay) {
+      showCircleOverlay.addEventListener('change', () => {
+        if (network) network.redraw();
+      });
+    }
+
     // Group management event listeners (Phase 6)
     const groupSelectList = shadowRoot.getElementById('groupSelectList');
     const groupSearch = shadowRoot.getElementById('groupSearch');
@@ -2436,6 +2444,329 @@
     return `${name} (#${memberId})`;
   }
 
+  /**
+   * Circle overlay style generator
+   */
+  function circleOverlayStyle(circleId, depth) {
+    const hue = Math.abs(hashOffset(circleId, 41)) * 11 % 360;
+    const lightness = Math.max(34, 60 - depth * 4);
+    return {
+      fill: `hsla(${hue}, 70%, ${lightness}%, 0.14)`,
+      stroke: `hsla(${hue}, 70%, ${lightness + 6}%, 0.22)`,
+      glow: `hsla(${hue}, 70%, ${Math.min(80, lightness + 18)}%, 0.25)`
+    };
+  }
+
+  /**
+   * Compute convex hull using Graham scan
+   */
+  function convexHull(points) {
+    if (points.length <= 1) return points.slice();
+    const sorted = points.slice().sort((a, b) => a.x === b.x ? a.y - b.y : a.x - b.x);
+    const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const lower = [];
+    sorted.forEach(p => {
+      while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
+        lower.pop();
+      }
+      lower.push(p);
+    });
+    const upper = [];
+    for (let i = sorted.length - 1; i >= 0; i -= 1) {
+      const p = sorted[i];
+      while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
+        upper.pop();
+      }
+      upper.push(p);
+    }
+    upper.pop();
+    lower.pop();
+    return lower.concat(upper);
+  }
+
+  /**
+   * Expand polygon outward from center
+   */
+  function expandPolygon(points, padding) {
+    const center = points.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+    center.x /= points.length;
+    center.y /= points.length;
+    return points.map(p => {
+      const dx = p.x - center.x;
+      const dy = p.y - center.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      const scale = (len + padding) / len;
+      return { x: center.x + dx * scale, y: center.y + dy * scale };
+    });
+  }
+
+  /**
+   * Build rounded path with quadratic curves
+   */
+  function buildRoundedPath(ctx, points, radius) {
+    if (points.length < 3) return;
+    const maxRadius = Math.max(0, radius);
+    const count = points.length;
+
+    const getVec = (from, to) => {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      return { x: dx / len, y: dy / len, len };
+    };
+
+    const first = points[0];
+    const prev = points[count - 1];
+    const v0 = getVec(first, prev);
+    const v1 = getVec(first, points[1]);
+    const r0 = Math.min(maxRadius, v0.len * 0.45, v1.len * 0.45);
+    const start = { x: first.x - v0.x * r0, y: first.y - v0.y * r0 };
+
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+
+    for (let i = 0; i < count; i += 1) {
+      const p = points[i];
+      const pPrev = points[(i - 1 + count) % count];
+      const pNext = points[(i + 1) % count];
+      const vPrev = getVec(p, pPrev);
+      const vNext = getVec(p, pNext);
+      const r = Math.min(maxRadius, vPrev.len * 0.45, vNext.len * 0.45);
+      const pIn = { x: p.x - vPrev.x * r, y: p.y - vPrev.y * r };
+      const pOut = { x: p.x + vNext.x * r, y: p.y + vNext.y * r };
+      ctx.lineTo(pIn.x, pIn.y);
+      ctx.quadraticCurveTo(p.x, p.y, pOut.x, pOut.y);
+    }
+    ctx.closePath();
+  }
+
+  /**
+   * Draw padded hull with constant-width glow
+   */
+  function drawPaddedHull(ctx, points, padding, style, width, blur) {
+    if (points.length < 2) return;
+    const hull = convexHull(points);
+    if (hull.length < 2) return;
+
+    const hullLen = hull.length;
+    
+    // Step 1: Calculate perpendicular normals for each edge
+    const edgeNormals = [];
+    for (let i = 0; i < hullLen; i++) {
+      const p1 = hull[i];
+      const p2 = hull[(i + 1) % hullLen];
+      
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len = Math.sqrt(dx * dx + dy * dy) || 1;
+      
+      // Outward normal perpendicular to edge
+      const nx = dy / len;
+      const ny = -dx / len;
+      
+      edgeNormals.push({ nx, ny, len });
+    }
+    
+    // Step 2: Calculate outer points using averaged normals for smooth corners
+    const outerPoints = [];
+    for (let i = 0; i < hullLen; i++) {
+      const prevNormal = edgeNormals[(i - 1 + hullLen) % hullLen];
+      const currNormal = edgeNormals[i];
+      
+      // Average the normals to handle corners smoothly
+      const avgNx = prevNormal.nx + currNormal.nx;
+      const avgNy = prevNormal.ny + currNormal.ny;
+      const avgLen = Math.sqrt(avgNx * avgNx + avgNy * avgNy) || 1;
+      
+      outerPoints.push({
+        x: hull[i].x + (avgNx / avgLen) * padding,
+        y: hull[i].y + (avgNy / avgLen) * padding
+      });
+    }
+    
+    // Step 3: Draw edge strips (rectangles with constant width)
+    ctx.fillStyle = style.fill;
+    ctx.shadowColor = style.glow;
+    ctx.shadowBlur = blur;
+    
+    for (let i = 0; i < hullLen; i++) {
+      const p1 = hull[i];
+      const p2 = hull[(i + 1) % hullLen];
+      const normal = edgeNormals[i];
+      
+      // Expand both endpoints along the edge-specific normal
+      const o1 = {
+        x: p1.x + normal.nx * padding,
+        y: p1.y + normal.ny * padding
+      };
+      const o2 = {
+        x: p2.x + normal.nx * padding,
+        y: p2.y + normal.ny * padding
+      };
+      
+      // Draw rectangle: o1, o2, p2, p1 (outer to inner order)
+      ctx.beginPath();
+      ctx.moveTo(o1.x, o1.y);
+      ctx.lineTo(o2.x, o2.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    // Step 4: Draw corner arcs to smoothly connect edge strips
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < hullLen; i++) {
+      const vertex = hull[i];
+      const prevNormal = edgeNormals[(i - 1 + hullLen) % hullLen];
+      const currNormal = edgeNormals[i];
+      
+      // Points at the end of previous edge and start of current edge
+      const p1_end = {
+        x: vertex.x + prevNormal.nx * padding,
+        y: vertex.y + prevNormal.ny * padding
+      };
+      const p2_start = {
+        x: vertex.x + currNormal.nx * padding,
+        y: vertex.y + currNormal.ny * padding
+      };
+      
+      // Calculate angles for arc
+      let angle1 = Math.atan2(p1_end.y - vertex.y, p1_end.x - vertex.x);
+      let angle2 = Math.atan2(p2_start.y - vertex.y, p2_start.x - vertex.x);
+      
+      // Normalize: ensure angle2 > angle1
+      while (angle2 <= angle1) angle2 += Math.PI * 2;
+      
+      // Draw arc to bridge the corner gap
+      ctx.beginPath();
+      ctx.arc(vertex.x, vertex.y, padding, angle1, angle2, false);
+      ctx.lineTo(vertex.x, vertex.y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    // Step 5: Draw interior fill
+    ctx.beginPath();
+    hull.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /**
+   * Draw capsule shape (for 2-node circles)
+   */
+  function drawCapsule(ctx, p0, p1, radius, style, width, blur) {
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    
+    // Perpendicular normal (90° rotation, reversed for outward direction)
+    const nx = uy;
+    const ny = -ux;
+
+    // Rectangle corners (perpendicular expansion with constant width)
+    const left0 = { x: p0.x + nx * radius, y: p0.y + ny * radius };
+    const left1 = { x: p1.x + nx * radius, y: p1.y + ny * radius };
+    const right1 = { x: p1.x - nx * radius, y: p1.y - ny * radius };
+    const right0 = { x: p0.x - nx * radius, y: p0.y - ny * radius };
+
+    // Draw rectangular strip with constant width
+    ctx.fillStyle = style.fill;
+    ctx.shadowColor = style.glow;
+    ctx.shadowBlur = blur;
+    
+    ctx.beginPath();
+    ctx.moveTo(left0.x, left0.y);
+    ctx.lineTo(left1.x, left1.y);
+    ctx.lineTo(right1.x, right1.y);
+    ctx.lineTo(right0.x, right0.y);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Draw semicircle caps at each endpoint
+    ctx.shadowBlur = 0;
+    
+    // Angle from center to normal direction
+    const angle_n = Math.atan2(ny, nx);
+    
+    // Cap at p1 (connects left1 to right1)
+    ctx.beginPath();
+    ctx.arc(p1.x, p1.y, radius, angle_n, angle_n + Math.PI, false);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Cap at p0 (connects right0 to left0)
+    ctx.beginPath();
+    ctx.arc(p0.x, p0.y, radius, angle_n + Math.PI, angle_n + Math.PI * 2, false);
+    ctx.lineTo(p0.x, p0.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /**
+   * Build circle overlay entries from visible nodes
+   */
+  function buildCircleOverlayEntries(visibleNodeIds, circleToNodes, allowedCircleIds = null) {
+    const entries = [];
+    const { ordered, childrenById } = buildCircleForest(markData.circles);
+
+    ordered.forEach(({ id, depth }) => {
+      if (allowedCircleIds && !allowedCircleIds.has(String(id))) return;
+      const descendants = getCircleDescendants(id, childrenById);
+      const circleSet = new Set([id, ...descendants]);
+      const memberSet = new Set();
+
+      circleSet.forEach(circleId => {
+        const members = circleToNodes.get(circleId) || [];
+        members.forEach(nodeId => {
+          if (visibleNodeIds.has(nodeId)) memberSet.add(nodeId);
+        });
+      });
+
+      if (memberSet.size < 2) return;
+      const members = Array.from(memberSet);
+      const style = circleOverlayStyle(id, depth);
+      entries.push({ id, members, depth, style });
+    });
+
+    entries.sort((a, b) => a.depth - b.depth);
+    return entries;
+  }
+
+  /**
+   * Draw circle overlay on canvas
+   */
+  function drawCircleOverlay(ctx) {
+    const showCircleOverlay = shadowRoot.getElementById('showCircleOverlay');
+    if (!showCircleOverlay || !showCircleOverlay.checked || !circleOverlayEntries.length) return;
+    const scale = network ? network.getScale() : 1;
+    const lineBase = Math.max(1.1, 2.4 / scale);
+    const blurBase = Math.max(6, 14 / scale);
+
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    circleOverlayEntries.forEach(entry => {
+      const positions = network.getPositions(entry.members);
+      const pts = Object.values(positions);
+      const padding = 28 + entry.depth * 10;
+      const blur = blurBase + entry.depth * 1.6;
+      if (pts.length === 2) {
+        drawCapsule(ctx, pts[0], pts[1], padding, entry.style, lineBase + entry.depth * 0.35, blur);
+        return;
+      }
+      if (pts.length < 3) return;
+      drawPaddedHull(ctx, pts, padding, entry.style, lineBase + entry.depth * 0.35, blur);
+    });
+    ctx.restore();
+  }
+
   function setCircleParent(childId, parentId, parentById) {
     const prevParent = parentById.get(childId);
     if (prevParent && markData.circles[prevParent]) {
@@ -3027,6 +3358,14 @@
     renderFilteredList(displayNodes);
     renderCircleFilters(circleToNodes);
 
+    // Build circle overlay entries
+    const visibleNodeIds = new Set(displayNodes.map(n => n.id));
+    const circleFilterEnabled = shadowRoot.getElementById('circleFilterEnabled');
+    const allowedCircleIds = circleFilterEnabled && circleFilterEnabled.checked && circleFilterSelected.size > 0
+      ? getExpandedCircleFilterSet(circleFilterSelected)
+      : null;
+    circleOverlayEntries = buildCircleOverlayEntries(visibleNodeIds, circleToNodes, allowedCircleIds);
+
     // Save viewport position before re-render
     const savedViewPosition = network ? network.getViewPosition() : null;
     const savedScale = network ? network.getScale() : null;
@@ -3098,7 +3437,12 @@
         }
       });
 
-      console.log('[BC-Bio-Visualizer] Network initialized with pin support');
+      // Draw circle overlay before network rendering
+      network.on("beforeDrawing", ctx => {
+        drawCircleOverlay(ctx);
+      });
+
+      console.log('[BC-Bio-Visualizer] Network initialized with pin support and circle overlay');
     }
 
     // Restore viewport position if we had one, otherwise fit on first render
