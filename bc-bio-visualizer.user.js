@@ -2669,12 +2669,14 @@
         invalidateGraph();
       });
 
-      // Node deselection event — re-render to remove expanded neighbors
-      network.on("deselectNode", () => {
+      // Node deselection event — only deselect when switching to another node
+      // (clicking blank space should NOT deselect or re-render)
+      network.on("deselectNode", (params) => {
         if (isRerendering) return;
-        selectedNodeId = null;
-        hideDetail();
-        invalidateGraph();
+        // If no new node is selected (blank click), restore previous selection
+        if (selectedNodeId && (!params.nodes || params.nodes.length === 0)) {
+          network.selectNodes([selectedNodeId]);
+        }
       });
 
       // Double-click to pin/unpin nodes
