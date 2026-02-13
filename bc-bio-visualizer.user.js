@@ -483,7 +483,7 @@
    */
   function getStyles() {
     return `
-      :root {
+      :host {
         --bg: #0f1115;
         --panel: #171a21;
         --panel-2: #1f2430;
@@ -506,6 +506,7 @@
         color: var(--text);
         display: grid;
         grid-template-rows: auto 1fr;
+        overflow: hidden;
       }
 
       header {
@@ -701,6 +702,199 @@
         margin-bottom: 6px;
       }
 
+      .group-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      .group-members {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 8px;
+        font-size: 12px;
+        color: var(--muted);
+        max-height: 140px;
+        overflow: auto;
+        background: var(--panel-2);
+      }
+
+      .circle-filter-list {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 8px;
+        background: var(--panel-2);
+        max-height: 180px;
+        overflow: auto;
+      }
+
+      .circle-filter-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+
+      .circle-filter-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .circle-filter-item .filter-indent {
+        display: inline-block;
+      }
+
+      .circle-filter-item .filter-dot {
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #2d3a52;
+        margin-right: 6px;
+      }
+
+      .tree-branch {
+        display: inline-block;
+        font-family: "Consolas", "Courier New", monospace;
+        color: #5f7aa3;
+        margin-right: 4px;
+        white-space: pre;
+      }
+
+      .circle-select-wrap {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px;
+        background: rgba(31, 36, 48, 0.6);
+      }
+
+      .circle-select-search {
+        width: 100%;
+        margin-bottom: 8px;
+      }
+
+      .circle-select-list {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 8px;
+        background: var(--panel-2);
+        max-height: 200px;
+        overflow: auto;
+      }
+
+      .circle-select-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        padding: 4px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-bottom: 4px;
+      }
+
+      .circle-select-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .circle-select-item.is-focused {
+        background: rgba(106, 201, 255, 0.12);
+        color: #cfe7ff;
+        box-shadow: inset 0 0 0 1px rgba(106, 201, 255, 0.4);
+      }
+
+      .group-select-wrap {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px;
+        background: rgba(31, 36, 48, 0.6);
+      }
+
+      .group-select-search {
+        width: 100%;
+        margin-bottom: 8px;
+      }
+
+      .group-select-list {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 8px;
+        background: var(--panel-2);
+        max-height: 200px;
+        overflow: auto;
+      }
+
+      .group-select-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        padding: 4px 6px;
+        border-radius: 6px;
+        cursor: pointer;
+        margin-bottom: 4px;
+      }
+
+      .group-select-item:last-child {
+        margin-bottom: 0;
+      }
+
+      .group-select-item.is-focused {
+        background: rgba(255, 184, 107, 0.12);
+        color: #ffe7cf;
+        box-shadow: inset 0 0 0 1px rgba(255, 184, 107, 0.4);
+      }
+
+      .tree-indent {
+        display: inline-block;
+      }
+
+      .tree-node-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #2d3a52;
+        margin: 0 6px 1px 0;
+      }
+
+      .drag-handle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        margin-right: 6px;
+        color: var(--muted);
+        cursor: grab;
+        user-select: none;
+      }
+
+      .drag-handle:active {
+        cursor: grabbing;
+      }
+
+      .tree-root-drop {
+        border: 1px dashed var(--line);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 11px;
+        color: var(--muted);
+        text-align: center;
+        margin: 4px 0 8px;
+        transition: all 0.15s;
+      }
+
+      .tree-root-drop.is-drop-target {
+        border-color: var(--accent);
+        color: var(--text);
+        background: rgba(106, 201, 255, 0.08);
+      }
+
       .loading-overlay {
         position: absolute;
         top: 0;
@@ -799,35 +993,60 @@
 
       /* Group selector styles (Phase 6) */
       .select-item {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
         align-items: center;
         gap: 8px;
         padding: 6px 8px;
         border-radius: 6px;
-        background: var(--panel);
-        margin-bottom: 4px;
-        transition: background 0.15s ease;
+        transition: background 0.15s;
       }
 
       .select-item:hover {
-        background: var(--panel-2);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .select-item.is-editing {
+        background: rgba(106, 201, 255, 0.08);
       }
 
       .select-item.is-focused {
-        background: var(--panel-2);
-        border: 1px solid var(--accent);
+        background: rgba(255, 255, 255, 0.04);
+        box-shadow: inset 0 0 0 1px rgba(106, 201, 255, 0.25);
       }
 
-      .select-item.is-editing,
       .select-item.is-creating {
-        background: var(--panel-2);
-        border: 1px solid var(--accent-2);
+        background: rgba(106, 201, 255, 0.08);
+        border: 1px dashed var(--accent);
+        margin-top: 8px;
+      }
+
+      .select-item.is-implied .item-label {
+        color: var(--muted);
+      }
+
+      .select-item.is-drop-target {
+        outline: 1px dashed var(--accent);
+        background: rgba(106, 201, 255, 0.08);
       }
 
       .select-item input[type="radio"] {
         flex-shrink: 0;
+        margin: 0;
         cursor: pointer;
         accent-color: var(--accent);
+      }
+
+      .select-item input[type="checkbox"],
+      .select-item input[type="radio"] {
+        margin: 0;
+        cursor: pointer;
+      }
+
+      .select-item input[type="checkbox"]:disabled,
+      .select-item input[type="radio"]:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
       }
 
       .select-item .item-label {
@@ -836,75 +1055,112 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        color: var(--text);
         cursor: pointer;
+        user-select: none;
       }
 
       .select-item .item-input {
         flex: 1;
         font-size: 13px;
-        padding: 4px 6px;
+        padding: 4px 8px;
         border-radius: 4px;
         background: var(--panel);
-        border: 1px solid var(--line);
+        border: 1px solid var(--accent);
         color: var(--text);
+        outline: none;
       }
 
       .select-item .item-input:focus {
         outline: none;
-        border-color: var(--accent);
+        border-color: var(--accent-2);
       }
 
       .select-item .item-actions {
         display: flex;
         gap: 4px;
         flex-shrink: 0;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+
+      .select-item:hover .item-actions {
+        opacity: 1;
+      }
+
+      .select-item.is-editing .item-actions,
+      .select-item.is-creating .item-actions {
+        opacity: 1;
       }
 
       .icon-btn {
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        font-size: 14px;
-        padding: 2px 6px;
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
+        padding: 0;
         border-radius: 4px;
-        transition: background 0.15s ease;
-        color: var(--text);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--muted);
+        transition: all 0.15s ease;
       }
 
       .icon-btn:hover {
-        background: var(--line);
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text);
+        border-color: var(--line);
       }
 
       .icon-btn.save {
-        color: #4ade80;
+        color: #6ac9ff;
       }
 
       .icon-btn.save:hover {
-        background: rgba(74, 222, 128, 0.2);
+        background: rgba(106, 201, 255, 0.15);
+        border-color: #6ac9ff;
       }
 
       .icon-btn.delete {
-        color: #f87171;
+        color: #ff6b6b;
       }
 
       .icon-btn.delete:hover {
-        background: rgba(248, 113, 113, 0.2);
+        background: rgba(255, 107, 107, 0.15);
+        border-color: #ff6b6b;
       }
 
       .create-new-btn {
+        width: 100%;
+        text-align: left;
+        color: var(--muted);
+        padding: 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
         background: var(--panel);
         border: 1px dashed var(--line);
-        color: var(--accent);
-        padding: 8px;
-        font-size: 12px;
         cursor: pointer;
-        border-radius: 6px;
         transition: all 0.15s ease;
       }
 
       .create-new-btn:hover {
-        background: var(--panel-2);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
         border-color: var(--accent);
+      }
+
+      .create-new-btn::before {
+        content: "+";
+        font-size: 16px;
+        font-weight: bold;
       }
 
       /* Filtered list item hover (Phase 6) */
