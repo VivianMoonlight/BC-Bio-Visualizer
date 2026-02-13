@@ -1428,6 +1428,12 @@
     // Extract data button
     extractBtn.addEventListener('click', async () => {
       try {
+        // Check if vis-network is available
+        if (!isVisNetworkReady()) {
+          showToast('vis-network 库未加载，无法显示图形。请刷新页面重试。', 'error', 5000);
+          return;
+        }
+        
         showLoadingOverlay('提取数据中...');
         const data = await getData(true, (msg) => {
           updateLoadingMessage(msg);
@@ -2079,9 +2085,27 @@
 
   /**
    * Check if vis-network library is loaded
+   * Supports multiple loading patterns: global vis, window.vis, or unsafeWindow.vis
    */
   function isVisNetworkReady() {
-    return typeof vis !== 'undefined' && vis.Network;
+    // Check multiple possible locations where vis might be loaded
+    const visLocations = [
+      typeof vis !== 'undefined' ? vis : null,
+      typeof window.vis !== 'undefined' ? window.vis : null,
+      typeof unsafeWindow !== 'undefined' && typeof unsafeWindow.vis !== 'undefined' ? unsafeWindow.vis : null
+    ];
+    
+    for (const visObj of visLocations) {
+      if (visObj && visObj.Network) {
+        // Cache the reference for future use
+        if (typeof vis === 'undefined') {
+          window.vis = visObj;
+        }
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   /**
@@ -2601,22 +2625,96 @@
   // ============================================================================
 
   /**
+   * Manually load vis-network if @require fails
+   */
+  function manuallyLoadVisNetwork() {
+    return new Promise((resolve, reject) => {
+      console.log('[BC-Bio-Visualizer] Attempting manual vis-network load...');
+      
+      // Try multiple CDN sources
+      const cdnUrls = [
+        'https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js',
+        'https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/standalone/umd/vis-network.min.js'
+      ];
+      
+      let currentIndex = 0;
+      
+      function tryNextCdn() {
+        if (currentIndex >= cdnUrls.length) {
+          reject(new Error('All CDN sources failed'));
+          return;
+        }
+        
+        const url = cdnUrls[currentIndex];
+        console.log(`[BC-Bio-Visualizer] Trying CDN ${currentIndex + 1}/${cdnUrls.length}: ${url}`);
+        
+        const script = document.createElement('script');
+        script.src = url;
+        script.onload = () => {
+          console.log('[BC-Bio-Visualizer] Manual load successful from:', url);
+          // Wait a bit for the script to initialize
+          setTimeout(() => {
+            if (isVisNetworkReady()) {
+              resolve();
+            } else {
+              currentIndex++;
+              tryNextCdn();
+            }
+          }, 100);
+        };
+        script.onerror = () => {
+          console.warn('[BC-Bio-Visualizer] Failed to load from:', url);
+          currentIndex++;
+          tryNextCdn();
+        };
+        
+        document.head.appendChild(script);
+      }
+      
+      tryNextCdn();
+    });
+  }
+
+  /**
    * Wait for vis-network library to be loaded
    */
-  function waitForVisNetwork(maxAttempts = 20, interval = 100) {
-    return new Promise((resolve, reject) => {
+  function waitForVisNetwork(maxAttempts = 50, interval = 200) {
+    return new Promise(async (resolve, reject) => {
       let attempts = 0;
+      
+      console.log('[BC-Bio-Visualizer] Waiting for vis-network library...');
       
       const checkInterval = setInterval(() => {
         attempts++;
         
+        // Debug info every 10 attempts
+        if (attempts % 10 === 0) {
+          console.log(`[BC-Bio-Visualizer] Still waiting for vis-network... (attempt ${attempts}/${maxAttempts})`);
+          console.log('[BC-Bio-Visualizer] Debug: typeof vis =', typeof vis);
+          console.log('[BC-Bio-Visualizer] Debug: typeof window.vis =', typeof window.vis);
+          if (typeof unsafeWindow !== 'undefined') {
+            console.log('[BC-Bio-Visualizer] Debug: typeof unsafeWindow.vis =', typeof unsafeWindow.vis);
+          }
+        }
+        
         if (isVisNetworkReady()) {
           clearInterval(checkInterval);
-          console.log('[BC-Bio-Visualizer] vis-network loaded successfully');
+          console.log('[BC-Bio-Visualizer] vis-network loaded successfully after', attempts, 'attempts');
           resolve();
         } else if (attempts >= maxAttempts) {
           clearInterval(checkInterval);
-          reject(new Error('vis-network failed to load after ' + maxAttempts + ' attempts'));
+          console.error('[BC-Bio-Visualizer] Timeout waiting for vis-network');
+          console.error('[BC-Bio-Visualizer] Final state: typeof vis =', typeof vis);
+          console.error('[BC-Bio-Visualizer] Final state: typeof window.vis =', typeof window.vis);
+          
+          // Try manual loading as fallback
+          console.log('[BC-Bio-Visualizer] Attempting manual load as fallback...');
+          manuallyLoadVisNetwork()
+            .then(resolve)
+            .catch(err => {
+              reject(new Error('vis-network failed to load: ' + err.message));
+            });
         }
       }, interval);
     });
@@ -2639,12 +2737,13 @@
       // TODO: Implement fallback in later phase
     }
 
-    // Wait for vis-network to be loaded
+    // Wait for vis-network to be loaded (with fallback)
     try {
       await waitForVisNetwork();
     } catch (error) {
       console.error('[BC-Bio-Visualizer] Failed to load vis-network:', error);
-      return;
+      console.warn('[BC-Bio-Visualizer] Continuing with limited functionality...');
+      // Don't return - allow the UI to load, but graph won't work
     }
 
     // Create floating button
