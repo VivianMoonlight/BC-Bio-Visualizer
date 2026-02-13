@@ -1426,7 +1426,18 @@
     physicsToggleBtn.addEventListener('click', () => {
       usePhysics = !usePhysics;
       updatePhysicsButton();
-      applyFilters();
+      if (network) {
+        if (usePhysics) {
+          network.setOptions({ physics: { enabled: true, solver: "barnesHut", stabilization: { iterations: 200, updateInterval: 20 }, barnesHut: { gravitationalConstant: -12000, springLength: 100, springConstant: 0.012, damping: 0.4 }, minVelocity: 1, maxVelocity: 30 } });
+          network.once("stabilizationIterationsDone", () => {
+            network.setOptions({ physics: { enabled: false } });
+            usePhysics = false;
+            updatePhysicsButton();
+          });
+        } else {
+          network.setOptions({ physics: { enabled: false } });
+        }
+      }
     });
 
     // Fit button
@@ -1764,6 +1775,7 @@
   let currentGraphSignature = "";
   let manualPhysicsEnabled = false;
   let usePhysics = false;
+  let lastVisibleNodeCount = 0;
   let pinnedNodes = new Set();
 
   // Mark data structure
@@ -2038,7 +2050,7 @@
   /**
    * Compute graph based on filters (Phase 5 - with pinned nodes)
    */
-  function computeGraph() {
+  function computeGraph(positionMap) {
     if (!window.vis || !window.vis.Network) {
       console.error('[BC-Bio-Visualizer] vis-network not loaded');
       return null;
@@ -2097,6 +2109,35 @@
       nodes = nodes.filter(n => connected.has(n.id));
     }
 
+    // Preserve positions from previous layout
+    if (positionMap) {
+      const neighborMap = new Map();
+      edges.forEach(e => {
+        if (!neighborMap.has(e.from)) neighborMap.set(e.from, []);
+        if (!neighborMap.has(e.to)) neighborMap.set(e.to, []);
+        neighborMap.get(e.from).push(e.to);
+        neighborMap.get(e.to).push(e.from);
+      });
+
+      nodes = nodes.map(n => {
+        const pos = positionMap[n.id];
+        if (pos) {
+          return { ...n, x: pos.x, y: pos.y, fixed: false };
+        }
+
+        const neighbors = neighborMap.get(n.id) || [];
+        const neighborPositions = neighbors.map(id => positionMap[id]).filter(Boolean);
+        if (neighborPositions.length) {
+          const avg = neighborPositions.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+          const x = avg.x / neighborPositions.length;
+          const y = avg.y / neighborPositions.length;
+          return { ...n, x, y, fixed: false };
+        }
+
+        return n;
+      });
+    }
+
     // Apply group styles
     nodes = applyGroupStyle(nodes);
     
@@ -2122,7 +2163,7 @@
   function getNetworkOptions() {
     return {
       physics: {
-        enabled: usePhysics,
+        enabled: true,
         solver: "barnesHut",
         stabilization: { iterations: 200, updateInterval: 20 },
         barnesHut: { 
@@ -2156,7 +2197,8 @@
    * Apply filters and render graph (Phase 5 - with double-click pin)
    */
   function applyFilters() {
-    const graph = computeGraph();
+    const positionMap = !usePhysics && network ? network.getPositions() : null;
+    const graph = computeGraph(positionMap);
     if (!graph) return;
 
     const { nodes, edges, signature } = graph;
@@ -2173,8 +2215,11 @@
     if (!graphContainer) return;
 
     if (network) {
+      const physics = usePhysics
+        ? { enabled: true, solver: "barnesHut", stabilization: { iterations: 200, updateInterval: 20 }, barnesHut: { gravitationalConstant: -12000, springLength: 100, springConstant: 0.012, damping: 0.4 }, minVelocity: 1, maxVelocity: 30 }
+        : { enabled: false };
+      network.setOptions({ physics });
       network.setData(data);
-      network.setOptions({ physics: { enabled: usePhysics } });
     } else {
       const options = getNetworkOptions();
       network = new vis.Network(graphContainer, data, options);
@@ -2212,12 +2257,13 @@
       console.log('[BC-Bio-Visualizer] Network initialized with pin support');
     }
 
-    // Auto-fit on first render
-    if (nodes.length && !currentGraphSignature) {
-      setTimeout(() => {
+    // Auto-fit when node count changes
+    if (nodes.length && nodes.length !== lastVisibleNodeCount) {
+      requestAnimationFrame(() => {
         if (network) network.fit({ animation: false });
-      }, 100);
+      });
     }
+    lastVisibleNodeCount = nodes.length;
 
     currentGraphSignature = signature;
 
