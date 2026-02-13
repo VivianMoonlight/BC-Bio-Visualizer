@@ -1353,7 +1353,13 @@
           </div>
 
           <div class="field">
-            <label>固定成员</label>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+              <label style="margin:0;">固定成员</label>
+              <div style="display:flex; gap:4px;">
+                <button class="button" id="pinRoomBtn" style="font-size:11px; padding:2px 6px;" title="将当前房间所有成员添加到固定列表">固定房间</button>
+                <button class="button" id="clearPinnedBtn" style="font-size:11px; padding:2px 6px;" title="清除所有固定成员">清除固定</button>
+              </div>
+            </div>
             <div id="fixedList" class="muted" style="font-size:12px;">无固定节点</div>
           </div>
 
@@ -1619,6 +1625,59 @@
       document.body.appendChild(fileInput);
       fileInput.click();
     });
+
+    // Pin room members button
+    const pinRoomBtn = shadowRoot.getElementById('pinRoomBtn');
+    if (pinRoomBtn) {
+      pinRoomBtn.addEventListener('click', () => {
+        if (typeof ChatRoomCharacter === 'undefined' || !Array.isArray(ChatRoomCharacter)) {
+          showToast('未检测到聊天室成员数据 (ChatRoomCharacter)，请确保您在聊天室中', 'error', 4000);
+          return;
+        }
+        const memberNumbers = ChatRoomCharacter
+          .map(i => i.MemberNumber)
+          .filter(n => n !== undefined && n !== null);
+        if (memberNumbers.length === 0) {
+          showToast('当前房间没有成员', 'error', 3000);
+          return;
+        }
+        let addedCount = 0;
+        memberNumbers.forEach(num => {
+          const id = String(num);
+          if (!pinnedNodes.has(id)) {
+            pinnedNodes.add(id);
+            addedCount++;
+          }
+        });
+        saveMarkData();
+        renderPinnedList();
+        useIncrementalUpdate = true;
+        invalidateGraph();
+        useIncrementalUpdate = false;
+        showToast(`已固定 ${addedCount} 个房间成员 (共 ${memberNumbers.length} 人在房间)`, 'success', 3000);
+        console.log('[BC-Bio-Visualizer] Pinned room members:', memberNumbers);
+      });
+    }
+
+    // Clear all pinned nodes button
+    const clearPinnedBtn = shadowRoot.getElementById('clearPinnedBtn');
+    if (clearPinnedBtn) {
+      clearPinnedBtn.addEventListener('click', () => {
+        if (pinnedNodes.size === 0) {
+          showToast('没有固定成员需要清除', 'info', 2000);
+          return;
+        }
+        const count = pinnedNodes.size;
+        pinnedNodes.clear();
+        saveMarkData();
+        renderPinnedList();
+        useIncrementalUpdate = true;
+        invalidateGraph();
+        useIncrementalUpdate = false;
+        showToast(`已清除 ${count} 个固定成员`, 'success', 3000);
+        console.log('[BC-Bio-Visualizer] Cleared all pinned nodes');
+      });
+    }
 
     // Close button
     closeBtn.addEventListener('click', hideVisualizer);
