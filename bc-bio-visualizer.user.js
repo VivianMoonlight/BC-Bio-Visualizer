@@ -1575,7 +1575,9 @@
           await saveMarkData();
           renderPinnedList();
           renderCircleFilters(null);
+          useIncrementalUpdate = true;
           invalidateGraph();
+          useIncrementalUpdate = false;
           
           console.log('[BC-Bio-Visualizer] Marks imported successfully');
           showToast('分组数据导入成功！', 'success');
@@ -1613,7 +1615,9 @@
           return { ...n, label: `${name} (#${n.id})` };
         });
         currentGraphSignature = ''; // Force re-render
+        useIncrementalUpdate = true;
         applyFilters();
+        useIncrementalUpdate = false;
       });
     }
 
@@ -1687,7 +1691,9 @@
         }
         saveMarkData();
         updateMarkUI(selectedNodeId);
+        useIncrementalUpdate = true;
         invalidateGraph();
+        useIncrementalUpdate = false;
       });
 
       // Button clicks - CRUD operations
@@ -1715,7 +1721,9 @@
           saveMarkData();
           creatingGroup = false;
           updateMarkUI(selectedNodeId);
+          useIncrementalUpdate = true;
           invalidateGraph();
+          useIncrementalUpdate = false;
           return;
         }
         
@@ -1743,7 +1751,9 @@
           saveMarkData();
           editingGroupId = null;
           updateMarkUI(selectedNodeId);
+          useIncrementalUpdate = true;
           invalidateGraph();
+          useIncrementalUpdate = false;
           return;
         }
         
@@ -1766,7 +1776,9 @@
           delete markData.groups[groupId];
           saveMarkData();
           updateMarkUI(selectedNodeId);
+          useIncrementalUpdate = true;
           invalidateGraph();
+          useIncrementalUpdate = false;
           showToast(`分组 "${groupName}" 已删除`, 'success');
           return;
         }
@@ -1884,7 +1896,7 @@
   let circleMembersByNode = new Map();
   let circleFilterSelected = new Set();
   let isRerendering = false; // guard against setData-triggered deselect
-  let isSelectionChange = false; // flag for selection-triggered re-render (no physics/fit)
+  let useIncrementalUpdate = false; // flag to use incremental DataSet updates (no physics/fit/setData)
   let currentNodeDataSet = null;
   let currentEdgeDataSet = null;
   let lastRenderedSelectedNodeId = null;
@@ -2680,9 +2692,9 @@
       return;
     }
 
-    // Selection-triggered structural change: use incremental DataSet updates
+    // Incremental structural change: use incremental DataSet updates
     // to avoid physics re-stabilization, viewport jumps, and flicker
-    if (isSelectionChange && network && currentNodeDataSet && currentEdgeDataSet) {
+    if (useIncrementalUpdate && network && currentNodeDataSet && currentEdgeDataSet) {
       lastRenderedSelectedNodeId = selectedNodeId;
 
       // Incrementally update nodes
@@ -2751,9 +2763,9 @@
         const nodeId = params.nodes[0];
         selectedNodeId = nodeId;
         showDetail(nodeId);
-        isSelectionChange = true;
+        useIncrementalUpdate = true;
         applyFilters();
-        isSelectionChange = false;
+        useIncrementalUpdate = false;
       });
 
       // Node deselection event — only deselect when switching to another node
@@ -2779,7 +2791,9 @@
           }
           saveMarkData();
           renderPinnedList();
+          useIncrementalUpdate = true;
           invalidateGraph();
+          useIncrementalUpdate = false;
         }
       });
 
