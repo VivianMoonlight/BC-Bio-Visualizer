@@ -606,7 +606,7 @@
         background: radial-gradient(1200px 800px at 10% -10%, #1b2333, #0f1115);
         color: var(--text);
         display: grid;
-        grid-template-rows: auto 1fr;
+        grid-template-rows: auto auto 1fr;
         overflow: hidden;
       }
 
@@ -1334,6 +1334,339 @@
           grid-column: 1 / -1;
         }
       }
+
+      /* ===== Mobile Adaptation (< 768px) ===== */
+
+      .mobile-tab-bar {
+        display: none;
+      }
+
+      .toolbar-toggle {
+        display: none;
+      }
+
+      .toolbar-menu {
+        display: contents;
+      }
+
+      @media (max-width: 768px) {
+        :host {
+          --left-w: 100% !important;
+          --right-w: 100% !important;
+        }
+
+        header {
+          flex-wrap: wrap;
+          padding: 8px 12px;
+          gap: 8px;
+        }
+
+        header h1 {
+          font-size: 14px;
+        }
+
+        .pill {
+          font-size: 10px;
+          padding: 2px 5px;
+        }
+
+        .toolbar {
+          position: relative;
+          margin-left: auto;
+          gap: 6px;
+        }
+
+        .toolbar-toggle {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 36px;
+          height: 36px;
+          background: var(--panel-2);
+          color: var(--text);
+          border: 1px solid var(--line);
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 18px;
+          flex-shrink: 0;
+        }
+
+        .toolbar-toggle:hover,
+        .toolbar-toggle:active {
+          background: var(--panel);
+          border-color: var(--accent);
+        }
+
+        .toolbar-menu {
+          display: none;
+          position: absolute;
+          top: 100%;
+          right: 0;
+          margin-top: 6px;
+          background: var(--panel);
+          border: 1px solid var(--line);
+          border-radius: 10px;
+          padding: 8px;
+          z-index: 100;
+          min-width: 180px;
+          flex-direction: column;
+          gap: 6px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .toolbar-menu.is-open {
+          display: flex;
+        }
+
+        .toolbar-menu .button {
+          width: 100%;
+          text-align: center;
+          padding: 10px 12px;
+          font-size: 13px;
+          min-height: 40px;
+        }
+
+        .toolbar .button-close {
+          order: -1;
+          width: 36px;
+          height: 36px;
+          padding: 0;
+          font-size: 16px;
+          flex-shrink: 0;
+        }
+
+        /* Mobile tab bar */
+        .mobile-tab-bar {
+          display: flex;
+          border-bottom: 1px solid var(--line);
+          background: var(--panel);
+          padding: 0;
+        }
+
+        .mobile-tab {
+          flex: 1;
+          text-align: center;
+          padding: 10px 0;
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--muted);
+          background: transparent;
+          border: none;
+          border-bottom: 2px solid transparent;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .mobile-tab.is-active {
+          color: var(--accent);
+          border-bottom-color: var(--accent);
+          background: rgba(106, 201, 255, 0.05);
+        }
+
+        .mobile-tab:active {
+          background: rgba(106, 201, 255, 0.1);
+        }
+
+        /* Mobile main layout - tabbed */
+        main {
+          display: grid;
+          grid-template-columns: 1fr !important;
+          grid-template-rows: 1fr !important;
+          gap: 0 !important;
+          padding: 0 !important;
+        }
+
+        main > .splitter {
+          display: none !important;
+        }
+
+        main > .panel,
+        main > #graph {
+          display: none;
+          border-radius: 0;
+          border: none;
+          margin: 0;
+          height: 100%;
+          overflow: auto;
+        }
+
+        main > .panel.mobile-visible,
+        main > #graph.mobile-visible {
+          display: flex;
+          flex-direction: column;
+        }
+
+        #left-panel.mobile-visible {
+          padding: 12px;
+        }
+
+        #graph.mobile-visible {
+          display: block;
+          min-height: 0;
+        }
+
+        #detail-panel.mobile-visible {
+          padding: 12px;
+        }
+
+        /* Touch-friendly controls */
+        .button, select, input[type="text"], input[type="number"] {
+          min-height: 40px;
+          font-size: 14px;
+          padding: 8px 12px;
+        }
+
+        .checkbox-row {
+          min-height: 36px;
+          font-size: 13px;
+          gap: 10px;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+          width: 20px;
+          height: 20px;
+          flex-shrink: 0;
+        }
+
+        .stat {
+          font-size: 13px;
+          padding: 6px 0;
+        }
+
+        .field label {
+          font-size: 13px;
+          margin-bottom: 6px;
+        }
+
+        /* Touch-friendly list items */
+        .select-item {
+          padding: 10px 8px;
+          gap: 10px;
+        }
+
+        .select-item .item-label {
+          font-size: 14px;
+        }
+
+        .select-item .item-actions {
+          opacity: 1;
+        }
+
+        .icon-btn {
+          width: 32px;
+          height: 32px;
+          min-width: 32px;
+          font-size: 16px;
+        }
+
+        .create-new-btn {
+          min-height: 40px;
+          font-size: 13px;
+          padding: 10px;
+        }
+
+        /* Filtered list items - larger tap targets */
+        .filtered-item {
+          min-height: 32px !important;
+          font-size: 13px !important;
+          padding: 4px 0 !important;
+          display: flex !important;
+          align-items: center !important;
+        }
+
+        /* Circle/Group select items */
+        .circle-select-item,
+        .group-select-item,
+        .circle-filter-item {
+          font-size: 13px;
+          padding: 6px;
+          min-height: 36px;
+          gap: 10px;
+        }
+
+        .circle-filter-item input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+        }
+
+        .collapse-toggle {
+          font-size: 13px;
+          min-height: 36px;
+        }
+
+        /* Graph container on mobile */
+        #graph {
+          border-radius: 0 !important;
+          border: none !important;
+          min-height: 300px;
+        }
+
+        /* Detail panel on mobile */
+        .detail-title {
+          font-size: 16px;
+        }
+
+        .detail-sub {
+          font-size: 13px;
+        }
+
+        pre {
+          font-size: 14px;
+          line-height: 1.6;
+        }
+
+        /* Toast on mobile - bottom center */
+        .toast-container {
+          bottom: 16px;
+          right: 12px;
+          left: 12px;
+        }
+
+        .toast {
+          font-size: 13px;
+          padding: 10px 14px;
+          max-width: none;
+          width: 100%;
+        }
+
+        /* Usage tips adaptation */
+        .mobile-tips {
+          display: block;
+        }
+        .desktop-tips {
+          display: none;
+        }
+
+        /* Group members list */
+        .group-members {
+          font-size: 13px;
+          max-height: 200px;
+        }
+
+        /* Search inputs */
+        .circle-select-search,
+        .group-select-search {
+          min-height: 40px;
+          font-size: 14px;
+        }
+
+        /* Neighbor depth select */
+        #neighborDepth {
+          min-height: 40px;
+          font-size: 14px;
+        }
+      }
+
+      /* Desktop-only tips */
+      @media (min-width: 769px) {
+        .mobile-tips {
+          display: none;
+        }
+        .desktop-tips {
+          display: block;
+        }
+      }
     `;
   }
 
@@ -1348,16 +1681,24 @@
         <h1>BC 资料图查看器</h1>
         <span class="pill" id="file-status">未加载数据</span>
         <div class="toolbar">
-          <button class="button button-accent" id="extractBtn">提取数据</button>
-          <button class="button" id="exportMarksBtn">导出分组</button>
-          <button class="button" id="importMarksBtn">导入分组</button>
-          <button class="button" id="exportProfilesBtn" title="导出IndexedDB中的全部profiles原始数据">导出档案</button>
-          <button class="button" id="importProfilesBtn" title="导入profiles数据并与现有数据合并（保留更新的记录）">导入档案</button>
-          <button class="button button-accent" id="physicsToggleBtn" title="切换物理（空格）">开始物理</button>
-          <button class="button" id="fitBtn">适配</button>
+          <button class="toolbar-toggle" id="toolbarToggle" title="菜单">☰</button>
+          <div class="toolbar-menu" id="toolbarMenu">
+            <button class="button button-accent" id="extractBtn">提取数据</button>
+            <button class="button" id="exportMarksBtn">导出分组</button>
+            <button class="button" id="importMarksBtn">导入分组</button>
+            <button class="button" id="exportProfilesBtn" title="导出IndexedDB中的全部profiles原始数据">导出档案</button>
+            <button class="button" id="importProfilesBtn" title="导入profiles数据并与现有数据合并（保留更新的记录）">导入档案</button>
+            <button class="button button-accent" id="physicsToggleBtn" title="切换物理（空格）">开始物理</button>
+            <button class="button" id="fitBtn">适配</button>
+          </div>
           <button class="button button-close" id="closeBtn">关闭</button>
         </div>
       </header>
+      <nav class="mobile-tab-bar" id="mobileTabBar">
+        <button class="mobile-tab is-active" data-tab="left-panel">控制</button>
+        <button class="mobile-tab" data-tab="graph">图谱</button>
+        <button class="mobile-tab" data-tab="detail-panel">详情</button>
+      </nav>
       <main>
         <section class="panel" id="left-panel">
           <div class="field">
@@ -1441,12 +1782,19 @@
             <div id="fixedList" class="muted" style="font-size:12px;">无固定节点</div>
           </div>
 
-          <div class="muted" style="font-size:12px; margin-top: 12px;">
+          <div class="muted desktop-tips" style="font-size:12px; margin-top: 12px;">
             <strong>使用提示：</strong><br/>
             • 双击节点固定可见性<br/>
             • 空格键切换物理引擎<br/>
             • Ctrl+Shift+V 显示/隐藏<br/>
             • 点击筛选成员跳转到节点
+          </div>
+          <div class="muted mobile-tips" style="font-size:12px; margin-top: 12px;">
+            <strong>使用提示：</strong><br/>
+            • 双击节点固定可见性<br/>
+            • 双指缩放/拖动查看图谱<br/>
+            • 点击筛选成员跳转到节点<br/>
+            • 使用顶部标签切换面板
           </div>
         </section>
 
@@ -1539,6 +1887,72 @@
     const showLovership = shadowRoot.getElementById('showLovership');
     const hideIsolated = shadowRoot.getElementById('hideIsolated');
 
+    // ---- Mobile toolbar toggle ----
+    const toolbarToggle = shadowRoot.getElementById('toolbarToggle');
+    const toolbarMenu = shadowRoot.getElementById('toolbarMenu');
+    if (toolbarToggle && toolbarMenu) {
+      toolbarToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toolbarMenu.classList.toggle('is-open');
+      });
+      // Close menu when clicking outside
+      shadowRoot.addEventListener('click', (e) => {
+        if (!toolbarToggle.contains(e.target) && !toolbarMenu.contains(e.target)) {
+          toolbarMenu.classList.remove('is-open');
+        }
+      });
+      // Close menu after clicking a button inside
+      toolbarMenu.querySelectorAll('.button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          toolbarMenu.classList.remove('is-open');
+        });
+      });
+    }
+
+    // ---- Mobile tab navigation ----
+    const mobileTabBar = shadowRoot.getElementById('mobileTabBar');
+    if (mobileTabBar) {
+      const tabs = mobileTabBar.querySelectorAll('.mobile-tab');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => switchToMobileTab(tab.dataset.tab));
+      });
+
+      // Initialize: show left-panel on mobile by default
+      function initMobileTabs() {
+        if (window.matchMedia('(max-width: 768px)').matches) {
+          switchToMobileTab('left-panel');
+        } else {
+          // On desktop, remove mobile-visible classes so normal grid works
+          ['left-panel', 'graph', 'detail-panel'].forEach(id => {
+            const p = shadowRoot.getElementById(id);
+            if (p) p.classList.remove('mobile-visible');
+          });
+        }
+      }
+
+      // React to orientation/resize changes
+      const mobileMediaQuery = window.matchMedia('(max-width: 768px)');
+      const handleMobileChange = (e) => {
+        if (e.matches) {
+          const activeTab = mobileTabBar.querySelector('.mobile-tab.is-active');
+          switchToMobileTab(activeTab ? activeTab.dataset.tab : 'left-panel');
+        } else {
+          ['left-panel', 'graph', 'detail-panel'].forEach(id => {
+            const p = shadowRoot.getElementById(id);
+            if (p) p.classList.remove('mobile-visible');
+          });
+        }
+      };
+      if (mobileMediaQuery.addEventListener) {
+        mobileMediaQuery.addEventListener('change', handleMobileChange);
+      } else {
+        mobileMediaQuery.addListener(handleMobileChange);
+      }
+
+      initMobileTabs();
+    }
+
     // Extract data button
     extractBtn.addEventListener('click', async () => {
       try {
@@ -1564,6 +1978,11 @@
         fileStatus.textContent = `已加载 ${data.length} 条记录`;
         fileStatus.className = 'pill';
         console.log('[BC-Bio-Visualizer] Graph rendered successfully');
+
+        // Auto-switch to graph tab on mobile after extraction
+        if (window.matchMedia('(max-width: 768px)').matches) {
+          switchToMobileTab('graph');
+        }
       } catch (error) {
         hideLoadingOverlay();
         fileStatus.textContent = '数据提取失败';
@@ -2430,6 +2849,25 @@
   // ============================================================================
   // STATE MANAGEMENT (Phase 5)
   // ============================================================================
+
+  /**
+   * Switch to a specific mobile tab (used by various handlers)
+   */
+  function switchToMobileTab(tabId) {
+    if (!shadowRoot) return;
+    const mobileTabBar = shadowRoot.getElementById('mobileTabBar');
+    if (!mobileTabBar) return;
+    const tabs = mobileTabBar.querySelectorAll('.mobile-tab');
+    const panelIds = ['left-panel', 'graph', 'detail-panel'];
+    tabs.forEach(t => t.classList.toggle('is-active', t.dataset.tab === tabId));
+    panelIds.forEach(id => {
+      const panel = shadowRoot.getElementById(id);
+      if (panel) panel.classList.toggle('mobile-visible', id === tabId);
+    });
+    if (tabId === 'graph' && network) {
+      setTimeout(() => network.redraw(), 50);
+    }
+  }
 
   let rawMembers = [];
   let membersById = new Map();
@@ -4158,6 +4596,11 @@
     if (detailEmpty) detailEmpty.style.display = "none";
     if (detail) detail.style.display = "flex";
 
+    // Auto-switch to detail tab on mobile
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      switchToMobileTab('detail-panel');
+    }
+
     // Update group UI
     updateMarkUI(id);
   }
@@ -4314,6 +4757,14 @@
    */
   async function main() {
     console.log('[BC-Bio-Visualizer] v2.0.0 启动中...');
+
+    // Ensure viewport meta for mobile
+    if (!document.querySelector('meta[name="viewport"]')) {
+      const meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no';
+      document.head.appendChild(meta);
+    }
 
     // Check required features
     if (!window.indexedDB) {
