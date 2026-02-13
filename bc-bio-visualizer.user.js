@@ -2427,11 +2427,7 @@
     const focusSeed = selectedNodeId ? new Set(getGroupMembers(selectedNodeId)) : new Set();
     const pinnedSeed = new Set(pinnedNodes);
     
-    // If a node is selected (focused), use only focused + pinned nodes as seeds
-    // Otherwise use the filtered nodes (expandedAllowed) as seeds
-    const seedNodes = selectedNodeId 
-      ? new Set([...focusSeed, ...pinnedSeed])
-      : new Set([...expandedAllowed, ...pinnedSeed]);
+    const seedNodes = new Set([...expandedAllowed, ...focusSeed, ...pinnedSeed]);
 
     // Expand seeds by neighbor depth
     const expandedNodes = expandByDepth(seedNodes, edgesAllowedByType, depth);
