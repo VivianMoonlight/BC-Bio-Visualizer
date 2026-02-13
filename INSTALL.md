@@ -2,101 +2,94 @@
 
 ## 前置要求
 
-1. **浏览器**：Chrome、Firefox 或 Edge
-2. **扩展**：Tampermonkey
+- **浏览器**：Chrome、Firefox 或 Edge（现代版本）
+- **BC 网站**：需要 WCE 的 bce-past-profiles 数据库
 
-## 安装步骤
+> 根据使用场景选择安装方式：**书签** 或 **Tampermonkey**。
 
-### 第一步：安装 Tampermonkey
+---
 
-根据您的浏览器选择对应的安装链接：
+## 方式一：书签（Bookmarklet）
 
-#### Chrome / Edge
-1. 访问 [Chrome Web Store](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
-2. 点击"添加至 Chrome"或"添加至 Edge"
-3. 等待安装完成
+无需安装任何扩展，适合临时使用或不方便装插件的环境。
 
-#### Firefox
-1. 访问 [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/tampermonkey/)
-2. 点击"添加到 Firefox"
-3. 等待安装完成
+### 安装步骤
 
-### 第二步：安装 BC-Bio-Visualizer
+1. **创建书签**
+   - 在书签栏上右键 → "添加书签"（或 `Ctrl+D`）
+   - 名称填写 `BC-Bio-Vis`（随意）
+   - 网址（URL）粘贴以下代码：
 
-#### 方式 A：直接安装脚本（推荐）
+```
+javascript:void(function(){var s=document.createElement('script');s.type='module';s.crossOrigin='anonymous';s.src='https://vivianmoonlight.github.io/BC-Bio-Visualizer/bc-bio-visualizer.user.js?'+Date.now();s.onload=function(){s.remove()};document.head.appendChild(s)})()
+```
 
-1. **下载脚本文件**
-   - 访问 GitHub 仓库
-   - 下载 `bc-bio-visualizer.user.js`
-   - 或点击：[直接安装](https://github.com/your-repo/BC-Bio-Visualizer/raw/main/bc-bio-visualizer.user.js)
+2. **使用**
+   - 打开 BC 网站并登录
+   - 点击书签栏上的 `BC-Bio-Vis` 书签
+   - 等待工具加载完成后即可使用
 
-2. **安装到 Tampermonkey**
-   - 浏览器会自动识别用户脚本
-   - 点击 Tampermonkey 的安装确认对话框
-   - 点击"安装"按钮
+### 书签方式的特点
 
-3. **确认安装**
-   - Tampermonkey 图标会显示激活的脚本数量
-   - 点击图标查看已安装的脚本列表
+| 优点 | 限制 |
+|------|------|
+| 无需安装扩展 | 每次需手动点击书签加载 |
+| 适合公共/临时电脑 | 不支持 GM API 持久化存储 |
+| 始终加载最新版本 | 分组数据需手动导出/导入 |
 
-#### 方式 B：手动安装
+---
 
-1. **打开 Tampermonkey 管理面板**
-   - 点击浏览器工具栏的 Tampermonkey 图标
-   - 选择"管理面板"
+## 方式二：Tampermonkey 用户脚本（推荐）
 
-2. **创建新脚本**
-   - 点击"+"按钮或"添加新脚本"
-   - 删除默认的模板代码
+优势：自动加载、数据持久化（分组、固定节点自动保存）、聊天命令 `/biovis`。
 
-3. **复制脚本代码**
-   - 打开 `bc-bio-visualizer.user.js` 文件
-   - 全选并复制所有代码
-   - 粘贴到 Tampermonkey 编辑器
+### 第一步：安装 Tampermonkey 扩展
 
-4. **保存脚本**
-   - 点击"文件" -> "保存"
-   - 或使用快捷键 `Ctrl+S`
+| 浏览器 | 安装链接 |
+|--------|---------|
+| Chrome / Edge | [Chrome Web Store](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) |
+| Firefox | [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/tampermonkey/) |
 
-#### 方式 C：使用 Loader（自动更新）
+### 第二步：安装脚本
 
-1. **安装 Loader**
-   - 下载 `loader.js`
-   - 点击：[安装 Loader](https://github.com/your-repo/BC-Bio-Visualizer/raw/main/loader.js)
+选择以下任一方式：
 
-2. **Loader 的优势**
-   - 自动检查更新（每24小时）
-   - 自动下载最新版本
-   - 支持离线缓存
-   - 无需重新安装脚本
+#### A. 一键安装（推荐）
 
-## 验证安装
+点击链接，Tampermonkey 会弹出安装页面 → 点击"安装"：
 
-### 1. 检查脚本状态
+> [**安装 BC-Bio-Visualizer**](https://github.com/VivianMoonlight/BC-Bio-Visualizer/raw/main/bc-bio-visualizer.user.js)
 
-1. 访问目标网站：
+#### B. 使用 Loader（自动更新）
+
+Loader 是轻量加载器，每次打开页面自动从 GitHub Pages 加载最新版本：
+
+> [**安装 Loader**](https://github.com/VivianMoonlight/BC-Bio-Visualizer/raw/main/loader.user.js)
+
+Loader 优势：
+- 始终加载最新版本
+- 无需手动更新脚本
+- 体积极小（< 1KB）
+
+#### C. 手动安装
+
+1. 点击 Tampermonkey 图标 → 管理面板 → "+"（添加新脚本）
+2. 删除默认模板代码
+3. 打开 [`bc-bio-visualizer.user.js`](https://github.com/VivianMoonlight/BC-Bio-Visualizer/blob/main/bc-bio-visualizer.user.js)，复制全部代码粘贴进去
+4. `Ctrl+S` 保存
+
+### 第三步：验证安装
+
+1. 访问 BC 网站：
    - https://www.bondageprojects.com/
    - https://bondageprojects.elementfx.com/
 
-2. 检查 Tampermonkey 图标
-   - 图标上应显示数字"1"（表示1个脚本已激活）
-   - 点击图标查看脚本名称
+2. 检查 Tampermonkey 图标上是否显示数字 `1`（脚本已激活）
 
-### 2. 测试功能
-
-1. **查看浮动按钮**
-   - 页面右下角应出现蓝色浮动按钮
-   - 按钮上有"BC"文字
-
-2. **打开可视化界面**
-   - 点击浮动按钮
-   - 或使用快捷键 `Ctrl+Shift+V`
-   - 应弹出全屏可视化界面
-
-3. **提取数据**
+3. 测试功能：
+   - 按 `Ctrl+Shift+V` 打开可视化界面
+   - 或在聊天框输入 `/biovis`
    - 点击"提取数据"按钮
-   - 等待数据提取完成
-   - 查看关系图是否正确显示
 
 ## 常见问题
 
@@ -193,7 +186,7 @@
 
 1. 查看[常见问题](#常见问题)
 2. 查看浏览器控制台错误信息
-3. 在 GitHub 上提交 Issue：[问题反馈](https://github.com/your-repo/BC-Bio-Visualizer/issues)
+3. 在 GitHub 上提交 Issue：[问题反馈](https://github.com/VivianMoonlight/BC-Bio-Visualizer/issues)
 
 ## 下一步
 
