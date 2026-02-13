@@ -1390,15 +1390,48 @@
               <label>恋爱</label>
               <div id="detailLovership" class="muted"></div>
             </div>
+            <div class="field" id="groupSection">
+              <div class="field-header">
+                <button class="collapse-toggle" id="groupToggleBtn" type="button">
+                  <span class="chevron" aria-hidden="true">v</span>
+                  <span>同一人分组</span>
+                </button>
+                <button class="button" id="groupClearBtn" type="button">清除</button>
+              </div>
+              <div class="field-body" id="groupSectionBody">
+                <div class="group-select-wrap">
+                  <input type="text" id="groupSearch" class="group-select-search" placeholder="筛选分组" />
+                  <div id="groupSelectList" class="group-select-list muted" style="font-size:12px;">
+                    没有分组
+                  </div>
+                </div>
+                <div class="group-members" id="groupMemberList"></div>
+              </div>
+            </div>
+
+            <div class="field" id="circleSection">
+              <div class="field-header">
+                <button class="collapse-toggle" id="circleToggleBtn" type="button">
+                  <span class="chevron" aria-hidden="true">v</span>
+                  <span>社交圈</span>
+                </button>
+              </div>
+              <div class="field-body" id="circleSectionBody">
+                <div class="circle-select-wrap">
+                  <input type="text" id="circleSearch" class="circle-select-search" placeholder="筛选圈子" />
+                  <div id="circleSelectList" class="circle-select-list muted" style="font-size:12px;">
+                    没有圈子
+                  </div>
+                </div>
+                <div class="group-members" id="circleMemberList"></div>
+              </div>
+            </div>
+
             <div class="field detail-description">
               <label>描述</label>
               <pre id="detailDesc"></pre>
             </div>
-            <div class="field">
-              <label>分组</label>
-              <input type="text" id="groupSearch" placeholder="搜索分组..." style="margin-bottom:8px;" />
-              <div id="groupSelectList" style="max-height:200px;overflow-y:auto;"></div>
-            </div>
+
           </div>
         </section>
       </main>
@@ -1871,6 +1904,13 @@
   let editingGroupId = null;
   let creatingGroup = false;
   let focusedGroupId = null;
+
+  // Circle management UI state
+  let editingCircleId = null;
+  let creatingCircle = false;
+  let focusedCircleId = null;
+  let dragCircleId = null;
+  let circleOverlayEntries = [];
 
   // ============================================================================
   // MARK DATA MANAGEMENT (Phase 5)
