@@ -864,6 +864,8 @@
     let manualPhysicsEnabled = false;
     let suppressAutoFit = false;
     let pendingViewAnchor = null;
+    let currentNodeDataSet = null;
+    let lastRenderedSelectedNodeId = null;
     let groupMembersByNode = new Map();
     let circleMembersByNode = new Map();
     let circleFilterSelected = new Set();
@@ -2101,7 +2103,6 @@
       const signature = JSON.stringify({
         nodes: displayNodes.map(n => `${n.id}:${markData.nodeToGroup[n.id] || ""}:${(markData.nodeToCircles[n.id] || []).join(",")}:${pinnedNodes.has(n.id) ? "p" : ""}`),
         edges: [...edges.map(e => e.id), ...groupEdges.map(e => e.id), ...circleEdges.map(e => e.id)],
-        selected: selectedNodeId || "",
         display: displayNickname && displayNickname.checked ? "nick" : "name",
         overlay: showCircleOverlay && showCircleOverlay.checked ? "on" : "off"
       });
@@ -2179,7 +2180,20 @@
       const graph = computeGraph(positionMap);
       if (!graph) return;
       const { nodes, displayNodes, edges, signature, seedNodes, isSingleSearch, circleToNodes, overlayEntries } = graph;
-      if (signature === currentGraphSignature) return;
+
+      // Selection-only change: update node visuals without full re-render
+      if (signature === currentGraphSignature && network && currentNodeDataSet) {
+        if (lastRenderedSelectedNodeId !== selectedNodeId) {
+          lastRenderedSelectedNodeId = selectedNodeId;
+          currentNodeDataSet.update(nodes);
+          if (selectedNodeId) {
+            suppressSelectionEvent = true;
+            network.selectNodes([String(selectedNodeId)], false);
+            setTimeout(() => { suppressSelectionEvent = false; }, 0);
+          }
+        }
+        return;
+      }
 
       circleOverlayEntries = overlayEntries || [];
 
@@ -2187,10 +2201,12 @@
       renderFixedList();
       renderCircleFilters(circleToNodes);
 
+      currentNodeDataSet = new vis.DataSet(nodes);
       const data = {
-        nodes: new vis.DataSet(nodes),
+        nodes: currentNodeDataSet,
         edges: new vis.DataSet(edges)
       };
+      lastRenderedSelectedNodeId = selectedNodeId;
 
       if (network) {
         const physics = manualPhysicsEnabled
@@ -2253,7 +2269,7 @@
         pendingViewAnchor = null;
       }
 
-      if (nodes.length && nodes.length !== lastVisibleNodeCount && !suppressAutoFit) {
+      if (nodes.length && lastVisibleNodeCount === 0 && !suppressAutoFit) {
         requestAnimationFrame(() => {
           if (network) network.fit({ animation: false });
         });

@@ -1851,6 +1851,8 @@
   let circleMembersByNode = new Map();
   let circleFilterSelected = new Set();
   let isRerendering = false; // guard against setData-triggered deselect
+  let currentNodeDataSet = null;
+  let lastRenderedSelectedNodeId = null;
 
   // Mark data structure
   const MARK_DATA_VERSION = 2;
@@ -2566,7 +2568,6 @@
     const signature = JSON.stringify({
       nodes: displayNodes.map(n => `${n.id}:${markData.nodeToGroup[n.id] || ""}:${(markData.nodeToCircles[n.id] || []).join(",")}:${pinnedNodes.has(n.id) ? "p" : ""}`),
       edges: [...edges.map(e => e.id), ...groupEdges.map(e => e.id), ...circleEdges.map(e => e.id)],
-      selected: selectedNodeId || "",
       display: displayNickname && displayNickname.checked ? "nick" : "name"
     });
 
@@ -2624,9 +2625,18 @@
     if (!graph) return;
 
     const { nodes, displayNodes, edges, signature, circleToNodes } = graph;
-    
-    // Skip if nothing changed
-    if (signature === currentGraphSignature) return;
+
+    // Selection-only change: update node visuals without full re-render
+    if (signature === currentGraphSignature && network && currentNodeDataSet) {
+      if (lastRenderedSelectedNodeId !== selectedNodeId) {
+        lastRenderedSelectedNodeId = selectedNodeId;
+        currentNodeDataSet.update(nodes);
+        if (selectedNodeId) {
+          network.selectNodes([selectedNodeId]);
+        }
+      }
+      return;
+    }
 
     // Render filtered list and circle filters using displayNodes (excludes hub nodes)
     renderFilteredList(displayNodes);
@@ -2636,10 +2646,12 @@
     const savedViewPosition = network ? network.getViewPosition() : null;
     const savedScale = network ? network.getScale() : null;
 
+    currentNodeDataSet = new vis.DataSet(nodes);
     const data = {
-      nodes: new vis.DataSet(nodes),
+      nodes: currentNodeDataSet,
       edges: new vis.DataSet(edges)
     };
+    lastRenderedSelectedNodeId = selectedNodeId;
 
     const graphContainer = shadowRoot.getElementById('graph');
     if (!graphContainer) return;
@@ -2710,7 +2722,7 @@
           });
         }
       });
-    } else if (nodes.length && nodes.length !== lastVisibleNodeCount) {
+    } else if (nodes.length && lastVisibleNodeCount === 0) {
       requestAnimationFrame(() => {
         if (network) network.fit({ animation: false });
       });
