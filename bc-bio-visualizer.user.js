@@ -3206,7 +3206,9 @@
       let color = n.color;
       let size = n.size;
       let borderWidth = n.borderWidth;
-      let shadow = n.shadow;
+      // Explicit false (not n.shadow/undefined) so vis.js DataSet.update()
+      // merge will clear stale shadow when a node loses its halo
+      let shadow = false;
 
       // 1. Group style
       const groupId = markData.nodeToGroup[n.id];
@@ -3251,7 +3253,7 @@
         modified = true;
       }
 
-      if (!modified) return n;
+      if (!modified) return { ...n, shadow: false };
       return { ...n, color, size, borderWidth, shadow };
     });
   }
@@ -4327,7 +4329,10 @@
     if (signature === currentGraphSignature && network && currentNodeDataSet) {
       if (lastRenderedSelectedNodeId !== selectedNodeId) {
         lastRenderedSelectedNodeId = selectedNodeId;
-        currentNodeDataSet.update(nodes);
+        // Ensure shadow is explicitly set — DataSet.update() is a merge,
+        // absent properties won't clear stale halo/shadow values
+        const nodesWithReset = nodes.map(n => ('shadow' in n) ? n : { ...n, shadow: false });
+        currentNodeDataSet.update(nodesWithReset);
         if (selectedNodeId) {
           network.selectNodes([selectedNodeId]);
         }
@@ -4350,6 +4355,9 @@
       const patchedNodes = nodes.map(n => {
         if (oldNodeIds.has(n.id)) {
           const { x, y, fixed, ...rest } = n;
+          // vis.js DataSet.update() merges — absent properties keep stale values.
+          // Explicitly reset shadow to clear halo when circle membership changes.
+          if (!('shadow' in rest)) rest.shadow = false;
           return rest;
         }
         return n;
