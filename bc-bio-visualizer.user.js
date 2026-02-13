@@ -1419,11 +1419,11 @@
       /* Mobile overlay panels */
       .mobile-nav {
         display: none;
-        position: absolute;
+        position: fixed;
         bottom: 12px;
         left: 50%;
         transform: translateX(-50%);
-        z-index: 100;
+        z-index: 1000100;
         background: rgba(23, 26, 33, 0.92);
         backdrop-filter: blur(8px);
         border: 1px solid var(--line);
@@ -1462,12 +1462,12 @@
       /* Panel overlay mode for mobile */
       .panel-overlay {
         display: none;
-        position: absolute;
+        position: fixed;
         top: 0;
         bottom: 0;
         width: 85vw;
         max-width: 360px;
-        z-index: 90;
+        z-index: 1000090;
         background: var(--panel);
         border: 1px solid var(--line);
         box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
@@ -1497,13 +1497,13 @@
 
       .panel-backdrop {
         display: none;
-        position: absolute;
+        position: fixed;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
+        width: 100vw;
+        height: 100vh;
         background: rgba(0, 0, 0, 0.5);
-        z-index: 80;
+        z-index: 1000080;
       }
 
       .panel-backdrop.is-open {
