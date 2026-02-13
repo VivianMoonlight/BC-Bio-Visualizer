@@ -3378,7 +3378,16 @@
       const newNodeIds = new Set(nodes.map(n => n.id));
       const toRemoveNodes = [...oldNodeIds].filter(id => !newNodeIds.has(id));
       if (toRemoveNodes.length) currentNodeDataSet.remove(toRemoveNodes);
-      currentNodeDataSet.update(nodes);
+      // Strip x/y/fixed from existing nodes to preserve their live positions;
+      // only new nodes get initial positions from computeGraph.
+      const patchedNodes = nodes.map(n => {
+        if (oldNodeIds.has(n.id)) {
+          const { x, y, fixed, ...rest } = n;
+          return rest;
+        }
+        return n;
+      });
+      currentNodeDataSet.update(patchedNodes);
 
       // Incrementally update edges
       const oldEdgeIds = new Set(currentEdgeDataSet.getIds());
