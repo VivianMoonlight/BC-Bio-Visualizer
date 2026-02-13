@@ -472,7 +472,7 @@
   }
 
   /**
-   * Get all CSS styles
+   * Get all CSS styles (Complete migration from bc-graph-viewer.html)
    */
   function getStyles() {
     return `
@@ -489,11 +489,7 @@
         --right-w: 320px;
       }
 
-      * { 
-        box-sizing: border-box; 
-        margin: 0;
-        padding: 0;
-      }
+      * { box-sizing: border-box; }
 
       .visualizer-container {
         width: 100vw;
@@ -517,6 +513,7 @@
 
       header h1 {
         font-size: 16px;
+        margin: 0;
         font-weight: 600;
         letter-spacing: 0.2px;
       }
@@ -588,6 +585,26 @@
         overflow: auto;
       }
 
+      #detail-panel {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      #detail {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: 100%;
+      }
+
+      #detail .field:last-of-type {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
       .splitter {
         cursor: col-resize;
         background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0));
@@ -606,6 +623,75 @@
         background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
         border: 1px solid var(--line);
         border-radius: 12px;
+      }
+
+      .field {
+        margin-bottom: 10px;
+      }
+
+      .field label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+
+      .field-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+
+      .collapse-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        background: transparent;
+        border: none;
+        color: var(--muted);
+        font-size: 12px;
+        padding: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .collapse-toggle .chevron {
+        display: inline-block;
+        width: 12px;
+        text-align: center;
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .field-body {
+        display: block;
+      }
+
+      .field.is-collapsed .field-body {
+        display: none;
+      }
+
+      textarea {
+        width: 100%;
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        resize: vertical;
+        min-height: 72px;
+      }
+
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
       }
 
       .loading-overlay {
@@ -641,63 +727,205 @@
         color: var(--muted);
       }
 
-      .field {
-        margin-bottom: 10px;
-      }
-
-      .field label {
-        display: block;
-        font-size: 12px;
-        color: var(--muted);
-        margin-bottom: 4px;
-      }
-
-      input[type="text"] {
+      input[type="text"], input[type="number"], select {
         width: 100%;
       }
 
-      #status {
+      .pill {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: #23304a;
+        color: #a9c7ff;
+        font-size: 11px;
+        margin-left: 6px;
+      }
+
+      .muted { color: var(--muted); }
+
+      .stat {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        padding: 4px 0;
+        border-bottom: 1px dashed var(--line);
+      }
+
+      .detail-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin: 0 0 6px 0;
+      }
+
+      .detail-sub {
         font-size: 12px;
         color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: transparent;
+        border: none;
+        padding: 4px 2px 8px;
+        border-radius: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+        font-size: 15px;
+        line-height: 1.65;
+        max-height: none;
+        min-height: 0;
+        overflow: auto;
+        color: #d6dbe6;
+      }
+
+      .detail-description {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .detail-description pre {
+        flex: 1 1 auto;
+      }
+
+      @media (max-width: 1200px) {
+        main {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr 280px;
+        }
+        .splitter {
+          display: none;
+        }
+        #detail-panel {
+          grid-column: 1 / -1;
+        }
       }
     `;
   }
 
   /**
-   * Create UI structure
+   * Create UI structure (Complete migration from bc-graph-viewer.html)
    */
   function createUIStructure() {
     const container = document.createElement('div');
     container.className = 'visualizer-container';
     container.innerHTML = `
       <header>
-        <h1>BC 资料图查看器 v2.0</h1>
-        <div id="status">未加载数据</div>
+        <h1>BC 资料图查看器</h1>
+        <span class="pill" id="file-status">未加载数据</span>
         <div class="toolbar">
-          <button id="extractBtn" class="button button-accent">提取数据</button>
-          <button id="refreshBtn" class="button">刷新</button>
-          <button id="closeBtn" class="button button-close">关闭</button>
+          <button class="button button-accent" id="extractBtn">提取数据</button>
+          <button class="button" id="exportMarksBtn">导出分组</button>
+          <button class="button" id="importMarksBtn">导入分组</button>
+          <button class="button button-accent" id="physicsToggleBtn" title="切换物理（空格）">开始物理</button>
+          <button class="button" id="fitBtn">适配</button>
+          <button class="button button-close" id="closeBtn">关闭</button>
         </div>
       </header>
       <main>
-        <div class="panel left-panel">
+        <section class="panel" id="left-panel">
           <div class="field">
-            <label>搜索</label>
-            <input type="text" id="searchInput" placeholder="输入姓名或编号..." />
+            <label for="search">搜索</label>
+            <input type="text" id="search" placeholder="姓名 / 昵称 / ID" />
           </div>
-          <p style="color: var(--muted); font-size: 12px; margin-top: 20px;">
-            更多功能正在迁移中...
-          </p>
-        </div>
-        <div class="splitter splitter-left"></div>
-        <div id="graph"></div>
-        <div class="splitter splitter-right"></div>
-        <div class="panel right-panel">
-          <h3 style="font-size: 14px; margin-bottom: 12px;">详情面板</h3>
-          <p style="color: var(--muted); font-size: 12px;">
-            点击节点查看详情
-          </p>
-        </div>
+
+          <div class="field">
+            <div class="checkbox-row">
+              <input type="checkbox" id="displayNickname" />
+              <label for="displayNickname">显示昵称</label>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="titleFilter">头衔筛选</label>
+            <select id="titleFilter">
+              <option value="">全部</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>显示圈子</label>
+            <div class="checkbox-row">
+              <input type="checkbox" id="circleFilterEnabled" />
+              <label for="circleFilterEnabled">显示选中圈子</label>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="showCircleOverlay" checked />
+              <label for="showCircleOverlay">显示圈子轮廓</label>
+            </div>
+            <div id="circleFilterList" class="muted" style="font-size:12px;">
+              没有圈子
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="checkbox-row">
+              <input type="checkbox" id="showOwnership" checked />
+              <label for="showOwnership">显示主仆</label>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="showLovership" checked />
+              <label for="showLovership">显示恋爱</label>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="hideIsolated" />
+              <label for="hideIsolated">隐藏孤立</label>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="neighborDepth">邻接深度</label>
+            <select id="neighborDepth">
+              <option value="1" selected>1跳</option>
+              <option value="2">2跳</option>
+              <option value="3">3跳</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>统计</label>
+            <div class="stat"><span>成员总数</span><span id="statMembers">0</span></div>
+            <div class="stat"><span>主仆关系数</span><span id="statOwnership">0</span></div>
+            <div class="stat"><span>恋爱关系数</span><span id="statLovership">0</span></div>
+          </div>
+
+          <div class="field">
+            <label>筛选成员</label>
+            <div id="filteredList" class="muted" style="font-size:12px;"></div>
+          </div>
+
+          <div class="muted" style="font-size:12px; margin-top: 12px;">
+            提示：双击节点固定可见性。按空格切换物理。
+          </div>
+        </section>
+
+        <div class="splitter" id="splitter-left" title="拖动调整大小"></div>
+
+        <section id="graph"></section>
+
+        <div class="splitter" id="splitter-right" title="拖动调整大小"></div>
+
+        <section class="panel" id="detail-panel">
+          <div id="detail-empty" class="muted">选择节点查看详情。</div>
+          <div id="detail" style="display:none;">
+            <h2 class="detail-title" id="detailName"></h2>
+            <div class="detail-sub" id="detailMeta"></div>
+            <div class="field">
+              <label>主仆</label>
+              <div id="detailOwnership" class="muted"></div>
+            </div>
+            <div class="field">
+              <label>恋爱</label>
+              <div id="detailLovership" class="muted"></div>
+            </div>
+            <div class="field detail-description">
+              <label>描述</label>
+              <pre id="detailDesc"></pre>
+            </div>
+          </div>
+        </section>
       </main>
     `;
     
@@ -705,14 +933,18 @@
   }
 
   /**
-   * Setup event listeners
+   * Setup event listeners (Phase 3 migration)
    */
   function setupEventListeners() {
     const extractBtn = shadowRoot.getElementById('extractBtn');
-    const refreshBtn = shadowRoot.getElementById('refreshBtn');
+    const refreshBtn = shadowRoot.getElementById('physicsToggleBtn');
     const closeBtn = shadowRoot.getElementById('closeBtn');
-    const statusEl = shadowRoot.getElementById('status');
+    const fitBtn = shadowRoot.getElementById('fitBtn');
+    const fileStatus = shadowRoot.getElementById('file-status');
+    const exportMarksBtn = shadowRoot.getElementById('exportMarksBtn');
+    const importMarksBtn = shadowRoot.getElementById('importMarksBtn');
 
+    // Extract data button
     extractBtn.addEventListener('click', async () => {
       try {
         showLoadingOverlay('提取数据中...');
@@ -720,20 +952,63 @@
           updateLoadingMessage(msg);
         });
         hideLoadingOverlay();
-        statusEl.textContent = `已加载 ${data.length} 条记录`;
-        alert(`数据提取成功！共 ${data.length} 条记录`);
+        fileStatus.textContent = `已加载 ${data.length} 条记录`;
+        fileStatus.className = 'pill';
+        console.log('[BC-Bio-Visualizer] Data extracted:', data.length, 'profiles');
+        
+        // TODO: Initialize graph visualization in Phase 4
+        alert(`数据提取成功！共 ${data.length} 条记录\n\n图形渲染功能将在阶段4实现`);
       } catch (error) {
         hideLoadingOverlay();
-        statusEl.textContent = '数据提取失败';
+        fileStatus.textContent = '数据提取失败';
+        console.error('[BC-Bio-Visualizer] Extraction error:', error);
         alert('数据提取失败: ' + error.message);
       }
     });
 
+    // Physics toggle (placeholder)
     refreshBtn.addEventListener('click', () => {
-      alert('刷新功能将在后续阶段实现');
+      alert('物理引擎切换将在阶段4实现');
     });
 
+    // Fit button (placeholder)
+    fitBtn.addEventListener('click', () => {
+      alert('适配功能将在阶段4实现');
+    });
+
+    // Export marks (placeholder)
+    exportMarksBtn.addEventListener('click', async () => {
+      try {
+        const markData = await Storage.get(CONFIG.STORAGE_KEY, '{}');
+        const blob = new Blob([markData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bc-marks-export-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        alert('分组数据导出成功！');
+      } catch (error) {
+        alert('导出失败: ' + error.message);
+      }
+    });
+
+    // Import marks (placeholder)
+    importMarksBtn.addEventListener('click', () => {
+      alert('导入分组功能将在阶段5实现');
+    });
+
+    // Close button
     closeBtn.addEventListener('click', hideVisualizer);
+
+    // Search input (placeholder)
+    const searchInput = shadowRoot.getElementById('search');
+    if (searchInput) {
+      searchInput.addEventListener('input', debounce(() => {
+        console.log('[BC-Bio-Visualizer] Search:', searchInput.value);
+        // TODO: Implement search in Phase 4
+      }, 300));
+    }
   }
 
   // ============================================================================
