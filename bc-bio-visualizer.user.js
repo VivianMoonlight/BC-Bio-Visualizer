@@ -445,10 +445,14 @@
   // ============================================================================
 
   /**
-   * Initialize visualizer UI
+   * Initialize visualizer UI (Phase 5 - with mark data loading)
    */
   async function initializeVisualizerUI() {
     if (networkInitialized) return;
+
+    // Load mark data
+    markData = await loadMarkData();
+    console.log('[BC-Bio-Visualizer] Mark data loaded:', Object.keys(markData.groups).length, 'groups,', Object.keys(markData.circles).length, 'circles');
 
     // Inject styles
     injectStyles();
@@ -458,6 +462,9 @@
 
     // Setup event listeners (will be expanded in later phases)
     setupEventListeners();
+
+    // Render pinned list
+    renderPinnedList();
 
     networkInitialized = true;
   }
@@ -790,6 +797,174 @@
         flex: 1 1 auto;
       }
 
+      /* Group selector styles (Phase 6) */
+      .select-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 6px;
+        background: var(--panel);
+        margin-bottom: 4px;
+        transition: background 0.15s ease;
+      }
+
+      .select-item:hover {
+        background: var(--panel-2);
+      }
+
+      .select-item.is-focused {
+        background: var(--panel-2);
+        border: 1px solid var(--accent);
+      }
+
+      .select-item.is-editing,
+      .select-item.is-creating {
+        background: var(--panel-2);
+        border: 1px solid var(--accent-2);
+      }
+
+      .select-item input[type="radio"] {
+        flex-shrink: 0;
+        cursor: pointer;
+        accent-color: var(--accent);
+      }
+
+      .select-item .item-label {
+        flex: 1;
+        font-size: 13px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .select-item .item-input {
+        flex: 1;
+        font-size: 13px;
+        padding: 4px 6px;
+        border-radius: 4px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        color: var(--text);
+      }
+
+      .select-item .item-input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+
+      .select-item .item-actions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+
+      .icon-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        transition: background 0.15s ease;
+        color: var(--text);
+      }
+
+      .icon-btn:hover {
+        background: var(--line);
+      }
+
+      .icon-btn.save {
+        color: #4ade80;
+      }
+
+      .icon-btn.save:hover {
+        background: rgba(74, 222, 128, 0.2);
+      }
+
+      .icon-btn.delete {
+        color: #f87171;
+      }
+
+      .icon-btn.delete:hover {
+        background: rgba(248, 113, 113, 0.2);
+      }
+
+      .create-new-btn {
+        background: var(--panel);
+        border: 1px dashed var(--line);
+        color: var(--accent);
+        padding: 8px;
+        font-size: 12px;
+        cursor: pointer;
+        border-radius: 6px;
+        transition: all 0.15s ease;
+      }
+
+      .create-new-btn:hover {
+        background: var(--panel-2);
+        border-color: var(--accent);
+      }
+
+      /* Filtered list item hover (Phase 6) */
+      .filtered-item:hover {
+        color: var(--accent);
+        text-decoration: underline;
+      }
+
+      /* Toast notification (Phase 6) */
+      .toast-container {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+      }
+
+      .toast {
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 13px;
+        color: var(--text);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        min-width: 200px;
+        max-width: 400px;
+        animation: toastSlideIn 0.2s ease;
+        pointer-events: auto;
+      }
+
+      .toast.success {
+        border-color: #4ade80;
+        background: rgba(74, 222, 128, 0.1);
+      }
+
+      .toast.error {
+        border-color: #f87171;
+        background: rgba(248, 113, 113, 0.1);
+      }
+
+      .toast.info {
+        border-color: var(--accent);
+        background: rgba(106, 201, 255, 0.1);
+      }
+
+      @keyframes toastSlideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+
       @media (max-width: 1200px) {
         main {
           grid-template-columns: 1fr;
@@ -896,8 +1071,17 @@
             <div id="filteredList" class="muted" style="font-size:12px;"></div>
           </div>
 
+          <div class="field">
+            <label>固定成员</label>
+            <div id="fixedList" class="muted" style="font-size:12px;">无固定节点</div>
+          </div>
+
           <div class="muted" style="font-size:12px; margin-top: 12px;">
-            提示：双击节点固定可见性。按空格切换物理。
+            <strong>使用提示：</strong><br/>
+            • 双击节点固定可见性<br/>
+            • 空格键切换物理引擎<br/>
+            • Ctrl+Shift+V 显示/隐藏<br/>
+            • 点击筛选成员跳转到节点
           </div>
         </section>
 
@@ -924,6 +1108,11 @@
               <label>描述</label>
               <pre id="detailDesc"></pre>
             </div>
+            <div class="field">
+              <label>分组</label>
+              <input type="text" id="groupSearch" placeholder="搜索分组..." style="margin-bottom:8px;" />
+              <div id="groupSelectList" style="max-height:200px;overflow-y:auto;"></div>
+            </div>
           </div>
         </section>
       </main>
@@ -933,16 +1122,22 @@
   }
 
   /**
-   * Setup event listeners (Phase 3 migration)
+   * Setup event listeners (Phase 4 - with graph rendering)
    */
   function setupEventListeners() {
     const extractBtn = shadowRoot.getElementById('extractBtn');
-    const refreshBtn = shadowRoot.getElementById('physicsToggleBtn');
+    const physicsToggleBtn = shadowRoot.getElementById('physicsToggleBtn');
     const closeBtn = shadowRoot.getElementById('closeBtn');
     const fitBtn = shadowRoot.getElementById('fitBtn');
     const fileStatus = shadowRoot.getElementById('file-status');
     const exportMarksBtn = shadowRoot.getElementById('exportMarksBtn');
     const importMarksBtn = shadowRoot.getElementById('importMarksBtn');
+    const searchInput = shadowRoot.getElementById('search');
+    const displayNickname = shadowRoot.getElementById('displayNickname');
+    const titleFilter = shadowRoot.getElementById('titleFilter');
+    const showOwnership = shadowRoot.getElementById('showOwnership');
+    const showLovership = shadowRoot.getElementById('showLovership');
+    const hideIsolated = shadowRoot.getElementById('hideIsolated');
 
     // Extract data button
     extractBtn.addEventListener('click', async () => {
@@ -951,63 +1146,1088 @@
         const data = await getData(true, (msg) => {
           updateLoadingMessage(msg);
         });
+        
+        // Build graph data
+        buildData(data);
+        
+        // Initial render
+        usePhysics = true;
+        applyFilters();
+        
         hideLoadingOverlay();
         fileStatus.textContent = `已加载 ${data.length} 条记录`;
         fileStatus.className = 'pill';
-        console.log('[BC-Bio-Visualizer] Data extracted:', data.length, 'profiles');
-        
-        // TODO: Initialize graph visualization in Phase 4
-        alert(`数据提取成功！共 ${data.length} 条记录\n\n图形渲染功能将在阶段4实现`);
+        console.log('[BC-Bio-Visualizer] Graph rendered successfully');
       } catch (error) {
         hideLoadingOverlay();
         fileStatus.textContent = '数据提取失败';
         console.error('[BC-Bio-Visualizer] Extraction error:', error);
-        alert('数据提取失败: ' + error.message);
+        showToast('数据提取失败: ' + error.message, 'error', 5000);
       }
     });
 
-    // Physics toggle (placeholder)
-    refreshBtn.addEventListener('click', () => {
-      alert('物理引擎切换将在阶段4实现');
+    // Physics toggle
+    physicsToggleBtn.addEventListener('click', () => {
+      usePhysics = !usePhysics;
+      updatePhysicsButton();
+      applyFilters();
     });
 
-    // Fit button (placeholder)
+    // Fit button
     fitBtn.addEventListener('click', () => {
-      alert('适配功能将在阶段4实现');
+      if (network) {
+        network.fit({ animation: true, animationDuration: 500 });
+      }
     });
 
-    // Export marks (placeholder)
+    // Export marks
     exportMarksBtn.addEventListener('click', async () => {
       try {
-        const markData = await Storage.get(CONFIG.STORAGE_KEY, '{}');
-        const blob = new Blob([markData], { type: 'application/json' });
+        const payload = {
+          version: MARK_DATA_VERSION,
+          nodeToGroup: markData.nodeToGroup,
+          groups: markData.groups,
+          nodeToCircles: markData.nodeToCircles,
+          circles: markData.circles,
+          pinnedNodes: Array.from(pinnedNodes)
+        };
+        const json = JSON.stringify(payload, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `bc-marks-export-${Date.now()}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        alert('分组数据导出成功！');
+        console.log('[BC-Bio-Visualizer] Marks exported');
+        showToast('分组数据导出成功！', 'success');
       } catch (error) {
-        alert('导出失败: ' + error.message);
+        console.error('[BC-Bio-Visualizer] Export error:', error);
+        showToast('导出失败: ' + error.message, 'error');
       }
     });
 
-    // Import marks (placeholder)
+    // Import marks
     importMarksBtn.addEventListener('click', () => {
-      alert('导入分组功能将在阶段5实现');
+      // Create hidden file input
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.json';
+      fileInput.style.display = 'none';
+      
+      fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        
+        try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          const normalized = normalizeMarkData(parsed);
+          
+          // Merge with existing data
+          markData.nodeToGroup = { ...markData.nodeToGroup, ...normalized.nodeToGroup };
+          markData.groups = { ...markData.groups, ...normalized.groups };
+          markData.nodeToCircles = { ...markData.nodeToCircles, ...normalized.nodeToCircles };
+          markData.circles = { ...markData.circles, ...normalized.circles };
+          
+          // Restore pinned nodes
+          pinnedNodes.clear();
+          if (Array.isArray(normalized.pinnedNodes)) {
+            normalized.pinnedNodes.forEach(id => pinnedNodes.add(String(id)));
+          }
+          
+          await saveMarkData();
+          renderPinnedList();
+          invalidateGraph();
+          
+          console.log('[BC-Bio-Visualizer] Marks imported successfully');
+          showToast('分组数据导入成功！', 'success');
+        } catch (error) {
+          console.error('[BC-Bio-Visualizer] Import error:', error);
+          showToast('导入失败: ' + error.message, 'error');
+        }
+        
+        fileInput.remove();
+      });
+      
+      document.body.appendChild(fileInput);
+      fileInput.click();
     });
 
     // Close button
     closeBtn.addEventListener('click', hideVisualizer);
 
-    // Search input (placeholder)
-    const searchInput = shadowRoot.getElementById('search');
+    // Search input with debounce
     if (searchInput) {
       searchInput.addEventListener('input', debounce(() => {
         console.log('[BC-Bio-Visualizer] Search:', searchInput.value);
-        // TODO: Implement search in Phase 4
+        applyFilters();
       }, 300));
+    }
+
+    // Display nickname toggle
+    if (displayNickname) {
+      displayNickname.addEventListener('change', () => {
+        // Rebuild labels
+        allNodes = allNodes.map(n => {
+          const m = membersById.get(n.id);
+          if (!m) return n;
+          const name = (displayNickname.checked && m.nickname) ? m.nickname : (m.name || '未知');
+          return { ...n, label: `${name} (#${n.id})` };
+        });
+        currentGraphSignature = ''; // Force re-render
+        applyFilters();
+      });
+    }
+
+    // Title filter
+    if (titleFilter) {
+      titleFilter.addEventListener('change', () => {
+        applyFilters();
+      });
+    }
+
+    // Relationship filters
+    [showOwnership, showLovership, hideIsolated].forEach(el => {
+      if (el) {
+        el.addEventListener('change', () => {
+          applyFilters();
+        });
+      }
+    });
+
+    // Group management event listeners (Phase 6)
+    const groupSelectList = shadowRoot.getElementById('groupSelectList');
+    const groupSearch = shadowRoot.getElementById('groupSearch');
+
+    if (groupSelectList) {
+      // Radio button change - assign group
+      groupSelectList.addEventListener("change", (event) => {
+        const target = event.target;
+        if (!target || target.type !== "radio") return;
+        if (!selectedNodeId) return;
+        
+        const item = target.closest('.select-item');
+        const groupId = item ? item.dataset.id : null;
+        
+        if (groupId) {
+          markData.nodeToGroup[String(selectedNodeId)] = groupId;
+        } else {
+          delete markData.nodeToGroup[String(selectedNodeId)];
+        }
+        saveMarkData();
+        updateMarkUI(selectedNodeId);
+        invalidateGraph();
+      });
+
+      // Button clicks - CRUD operations
+      groupSelectList.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!target) return;
+        
+        const action = target.dataset.action;
+        const item = target.closest('.select-item');
+        
+        if (action === 'start-create') {
+          creatingGroup = true;
+          renderGroupSelect(selectedNodeId);
+          return;
+        }
+        
+        if (action === 'create') {
+          const input = item.querySelector('.item-input');
+          const name = input.value.trim();
+          if (!name) return;
+          
+          const id = `g-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+          markData.groups[id] = { name, notes: "" };
+          markData.nodeToGroup[String(selectedNodeId)] = id;
+          saveMarkData();
+          creatingGroup = false;
+          updateMarkUI(selectedNodeId);
+          invalidateGraph();
+          return;
+        }
+        
+        if (action === 'cancel-create') {
+          creatingGroup = false;
+          renderGroupSelect(selectedNodeId);
+          return;
+        }
+        
+        if (!item || !item.dataset.id) return;
+        const groupId = item.dataset.id;
+        
+        if (action === 'edit') {
+          editingGroupId = groupId;
+          renderGroupSelect(selectedNodeId);
+          return;
+        }
+        
+        if (action === 'save') {
+          const input = item.querySelector('.item-input');
+          const newName = input.value.trim();
+          if (!newName) return;
+          
+          markData.groups[groupId].name = newName;
+          saveMarkData();
+          editingGroupId = null;
+          updateMarkUI(selectedNodeId);
+          invalidateGraph();
+          return;
+        }
+        
+        if (action === 'cancel') {
+          editingGroupId = null;
+          renderGroupSelect(selectedNodeId);
+          return;
+        }
+        
+        if (action === 'delete') {
+          const groupName = markData.groups[groupId].name;
+          if (!confirm(`删除分组 "${groupName}"？\n这将取消所有节点的该分组分配。`)) return;
+          
+          // Remove all node assignments
+          Object.keys(markData.nodeToGroup).forEach(id => {
+            if (markData.nodeToGroup[id] === groupId) {
+              delete markData.nodeToGroup[id];
+            }
+          });
+          delete markData.groups[groupId];
+          saveMarkData();
+          updateMarkUI(selectedNodeId);
+          invalidateGraph();
+          showToast(`分组 "${groupName}" 已删除`, 'success');
+          return;
+        }
+
+        // Focus group on click
+        if (item && !action) {
+          if (target.tagName !== "INPUT" && target.tagName !== "BUTTON") {
+            focusedGroupId = groupId;
+            renderGroupSelect(selectedNodeId);
+          }
+        }
+      });
+
+      // Keyboard shortcuts in group list
+      groupSelectList.addEventListener("keydown", (event) => {
+        if (event.key === 'Enter') {
+          const target = event.target;
+          if (target.classList.contains('item-input')) {
+            const item = target.closest('.select-item');
+            const saveBtn = item.querySelector('[data-action="save"], [data-action="create"]');
+            if (saveBtn) saveBtn.click();
+          }
+        }
+        if (event.key === 'Escape') {
+          const target = event.target;
+          if (target.classList.contains('item-input')) {
+            const item = target.closest('.select-item');
+            const cancelBtn = item.querySelector('[data-action="cancel"], [data-action="cancel-create"]');
+            if (cancelBtn) cancelBtn.click();
+          }
+        }
+      });
+    }
+
+    // Group search input
+    if (groupSearch) {
+      groupSearch.addEventListener("input", () => {
+        renderGroupSelect(selectedNodeId);
+      });
+    }
+
+    // Splitter drag functionality (Phase 6)
+    const splitterLeft = shadowRoot.getElementById('splitter-left');
+    const splitterRight = shadowRoot.getElementById('splitter-right');
+    let isDraggingSplitter = false;
+    let draggingSide = null;
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function beginSplitterDrag(side) {
+      // Skip on mobile
+      if (window.matchMedia("(max-width: 1200px)").matches) return;
+      isDraggingSplitter = true;
+      draggingSide = side;
+      document.body.style.cursor = "col-resize";
+    }
+
+    function endSplitterDrag() {
+      if (!isDraggingSplitter) return;
+      isDraggingSplitter = false;
+      draggingSide = null;
+      document.body.style.cursor = "";
+    }
+
+    function handleSplitterMove(event) {
+      if (!isDraggingSplitter) return;
+      const main = shadowRoot.querySelector("main");
+      if (!main) return;
+      
+      const rect = main.getBoundingClientRect();
+      const minLeft = 200;
+      const minRight = 260;
+      const maxLeft = rect.width - minRight - 80;
+      const maxRight = rect.width - minLeft - 80;
+
+      if (draggingSide === "left") {
+        const nextLeft = clamp(event.clientX - rect.left, minLeft, maxLeft);
+        shadowRoot.host.style.setProperty("--left-w", `${nextLeft}px`);
+      }
+
+      if (draggingSide === "right") {
+        const nextRight = clamp(rect.right - event.clientX, minRight, maxRight);
+        shadowRoot.host.style.setProperty("--right-w", `${nextRight}px`);
+      }
+    }
+
+    if (splitterLeft) {
+      splitterLeft.addEventListener("mousedown", () => beginSplitterDrag("left"));
+    }
+    if (splitterRight) {
+      splitterRight.addEventListener("mousedown", () => beginSplitterDrag("right"));
+    }
+    
+    document.addEventListener("mousemove", handleSplitterMove);
+    document.addEventListener("mouseup", endSplitterDrag);
+  }
+
+  // ============================================================================
+  // STATE MANAGEMENT (Phase 5)
+  // ============================================================================
+
+  let rawMembers = [];
+  let membersById = new Map();
+  let allNodes = [];
+  let allEdges = [];
+  let selectedNodeId = null;
+  let currentGraphSignature = "";
+  let manualPhysicsEnabled = false;
+  let usePhysics = false;
+  let pinnedNodes = new Set();
+
+  // Mark data structure
+  const MARK_DATA_VERSION = 2;
+  let markData = {
+    version: MARK_DATA_VERSION,
+    nodeToGroup: {},
+    groups: {},
+    nodeToCircles: {},
+    circles: {},
+    pinnedNodes: []
+  };
+
+  // Group management UI state
+  let editingGroupId = null;
+  let creatingGroup = false;
+  let focusedGroupId = null;
+
+  // ============================================================================
+  // MARK DATA MANAGEMENT (Phase 5)
+  // ============================================================================
+
+  /**
+   * Safe text conversion
+   */
+  function safeText(value) {
+    if (value === null || value === undefined) return "";
+    return String(value);
+  }
+
+  /**
+   * Show toast notification (Phase 6)
+   */
+  function showToast(message, type = 'info', duration = 3000) {
+    let toastContainer = shadowRoot.querySelector('.toast-container');
+    if (!toastContainer) {
+      toastContainer = document.createElement('div');
+      toastContainer.className = 'toast-container';
+      shadowRoot.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateX(100%)';
+      toast.style.transition = 'all 0.2s ease';
+      setTimeout(() => toast.remove(), 200);
+    }, duration);
+  }
+
+  /**
+   * Normalize mark data structure
+   */
+  function normalizeMarkData(parsed) {
+    const base = {
+      version: MARK_DATA_VERSION,
+      nodeToGroup: {},
+      groups: {},
+      nodeToCircles: {},
+      circles: {},
+      pinnedNodes: []
+    };
+    
+    if (!parsed || typeof parsed !== "object") return base;
+    
+    const nodeToGroup = parsed.nodeToGroup && typeof parsed.nodeToGroup === "object" ? parsed.nodeToGroup : {};
+    const groups = parsed.groups && typeof parsed.groups === "object" ? parsed.groups : {};
+    const nodeToCircles = parsed.nodeToCircles && typeof parsed.nodeToCircles === "object" ? parsed.nodeToCircles : {};
+    const rawCircles = parsed.circles && typeof parsed.circles === "object" ? parsed.circles : {};
+    
+    const circles = {};
+    Object.entries(rawCircles).forEach(([id, circle]) => {
+      const safeCircle = circle && typeof circle === "object" ? circle : {};
+      const children = Array.isArray(safeCircle.children)
+        ? safeCircle.children.map(child => String(child)).filter(child => child && child !== String(id))
+        : [];
+      circles[id] = { ...safeCircle, children };
+    });
+    
+    const pinnedNodesArray = Array.isArray(parsed.pinnedNodes) ? parsed.pinnedNodes : [];
+    
+    return { ...base, nodeToGroup, groups, nodeToCircles, circles, pinnedNodes: pinnedNodesArray };
+  }
+
+  /**
+   * Load mark data from storage
+   */
+  async function loadMarkData() {
+    try {
+      pinnedNodes.clear();
+      const raw = await Storage.get(CONFIG.STORAGE_KEY, '{}');
+      if (!raw || raw === '{}') return normalizeMarkData(null);
+      
+      const parsed = JSON.parse(raw);
+      const normalized = normalizeMarkData(parsed);
+      
+      // Restore pinned nodes Set
+      if (Array.isArray(normalized.pinnedNodes)) {
+        normalized.pinnedNodes.forEach(id => pinnedNodes.add(String(id)));
+      }
+      
+      return normalized;
+    } catch (err) {
+      console.error('[BC-Bio-Visualizer] Load mark data error:', err);
+      return normalizeMarkData(null);
+    }
+  }
+
+  /**
+   * Save mark data to storage
+   */
+  async function saveMarkData() {
+    try {
+      markData.pinnedNodes = Array.from(pinnedNodes);
+      const json = JSON.stringify(markData);
+      await Storage.set(CONFIG.STORAGE_KEY, json);
+      console.log('[BC-Bio-Visualizer] Mark data saved');
+    } catch (err) {
+      console.error('[BC-Bio-Visualizer] Save mark data error:', err);
+    }
+  }
+
+  /**
+   * Group color generator
+   */
+  function groupColor(groupId) {
+    const hue = Math.abs(hashOffset(groupId, 97)) * 17 % 360;
+    return {
+      border: `hsl(${hue}, 70%, 55%)`,
+      background: `hsl(${hue}, 45%, 20%)`
+    };
+  }
+
+  /**
+   * Apply group styles to nodes
+   */
+  function applyGroupStyle(nodes) {
+    return nodes.map(n => {
+      const groupId = markData.nodeToGroup[n.id];
+      if (!groupId) return n;
+      const color = groupColor(groupId);
+      return { ...n, color, size: 10, borderWidth: 2 };
+    });
+  }
+
+  /**
+   * Apply pinned nodes styling
+   */
+  function applyPinnedNodes(nodes) {
+    return nodes.map(n => {
+      if (!pinnedNodes.has(n.id)) return n;
+      const baseColor = n.color || { border: "#2b3240", background: "#1f2430" };
+      return {
+        ...n,
+        borderWidth: (n.borderWidth || 1) + 2,
+        color: { ...baseColor, border: "#6ac9ff" },
+        shadow: { enabled: true, color: "rgba(106, 201, 255, 0.45)", size: 14, x: 0, y: 0 }
+      };
+    });
+  }
+
+  /**
+   * Invalidate graph signature to force re-render
+   */
+  function invalidateGraph() {
+    currentGraphSignature = "";
+    applyFilters();
+  }
+
+  /**
+   * Build data from extracted profiles
+   */
+  function buildData(members) {
+    rawMembers = members;
+    membersById = new Map();
+
+    members.forEach(m => {
+      membersById.set(String(m.memberNumber), m);
+    });
+
+    const nodes = [];
+    const edges = [];
+
+    members.forEach(m => {
+      const id = String(m.memberNumber);
+      const displayName = shadowRoot.getElementById('displayNickname');
+      const name = (displayName && displayName.checked && m.nickname) ? m.nickname : (m.name || '未知');
+      const label = `${name} (#${id})`;
+      
+      nodes.push({
+        id,
+        label,
+        group: m.title || "无",
+        title: `${m.title || ''}\n${m.nickname || ''}`.trim(),
+        value: 1
+      });
+
+      // Ownership edges
+      if (m.ownership && m.ownership.MemberNumber !== undefined) {
+        const ownerId = String(m.ownership.MemberNumber);
+        edges.push({
+          id: `o-${ownerId}-${id}`,
+          from: ownerId,
+          to: id,
+          arrows: "to",
+          dashes: false,
+          color: { color: "#6ac9ff" },
+          width: 1,
+          dataType: "ownership"
+        });
+      }
+
+      // Lovership edges
+      if (Array.isArray(m.lovership)) {
+        m.lovership.forEach(l => {
+          if (!l || l.MemberNumber === undefined) return;
+          const loverId = String(l.MemberNumber);
+          edges.push({
+            id: `l-${id}-${loverId}`,
+            from: id,
+            to: loverId,
+            arrows: "",
+            dashes: true,
+            color: { color: "#ffb86b" },
+            width: 1,
+            dataType: "lovership"
+          });
+        });
+      }
+    });
+
+    // Add placeholder nodes for referenced members not in the list
+    const nodeIds = new Set(nodes.map(n => n.id));
+    edges.forEach(e => {
+      if (!nodeIds.has(e.from)) {
+        nodes.push({ id: e.from, label: `未知 (#${e.from})`, group: "未知" });
+        nodeIds.add(e.from);
+      }
+      if (!nodeIds.has(e.to)) {
+        nodes.push({ id: e.to, label: `未知 (#${e.to})`, group: "未知" });
+        nodeIds.add(e.to);
+      }
+    });
+
+    allNodes = nodes;
+    allEdges = edges;
+
+    // Update stats
+    const statMembers = shadowRoot.getElementById('statMembers');
+    const statOwnership = shadowRoot.getElementById('statOwnership');
+    const statLovership = shadowRoot.getElementById('statLovership');
+    
+    if (statMembers) statMembers.textContent = nodes.length;
+    if (statOwnership) statOwnership.textContent = edges.filter(e => e.dataType === "ownership").length;
+    if (statLovership) statLovership.textContent = edges.filter(e => e.dataType === "lovership").length;
+
+    // Update title filter
+    const titleFilter = shadowRoot.getElementById('titleFilter');
+    if (titleFilter) {
+      const titles = Array.from(new Set(members.map(m => m.title || "无"))).sort();
+      titleFilter.innerHTML = "<option value=\"\">全部</option>" + 
+        titles.map(t => `<option value="${t}">${t}</option>`).join("");
+    }
+
+    console.log('[BC-Bio-Visualizer] Data built:', nodes.length, 'nodes,', edges.length, 'edges');
+  }
+
+  /**
+   * Compute graph based on filters (Phase 5 - with pinned nodes)
+   */
+  function computeGraph() {
+    if (!window.vis || !window.vis.Network) {
+      console.error('[BC-Bio-Visualizer] vis-network not loaded');
+      return null;
+    }
+
+    const searchInput = shadowRoot.getElementById('search');
+    const titleFilter = shadowRoot.getElementById('titleFilter');
+    const showOwnership = shadowRoot.getElementById('showOwnership');
+    const showLovership = shadowRoot.getElementById('showLovership');
+    const hideIsolated = shadowRoot.getElementById('hideIsolated');
+    const displayNickname = shadowRoot.getElementById('displayNickname');
+
+    const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const title = titleFilter ? titleFilter.value : '';
+    const showO = showOwnership ? showOwnership.checked : true;
+    const showL = showLovership ? showLovership.checked : true;
+    const hideIso = hideIsolated ? hideIsolated.checked : false;
+
+    const allowedNodes = new Set();
+
+    // Filter nodes by search and title
+    allNodes.forEach(n => {
+      const m = membersById.get(n.id);
+      const name = m && m.name ? String(m.name).toLowerCase() : '';
+      const nickname = m && m.nickname ? String(m.nickname).toLowerCase() : '';
+      const idStr = n.id;
+      const titleMatch = !title || (m && (m.title || "无") === title);
+      const searchMatch = !q || name.includes(q) || nickname.includes(q) || idStr.includes(q);
+
+      if (titleMatch && searchMatch) {
+        allowedNodes.add(n.id);
+      }
+    });
+
+    // Always include pinned nodes
+    pinnedNodes.forEach(id => allowedNodes.add(String(id)));
+
+    // Filter edges by type
+    const edges = allEdges.filter(e => {
+      if (e.dataType === "ownership" && !showO) return false;
+      if (e.dataType === "lovership" && !showL) return false;
+      return allowedNodes.has(e.from) && allowedNodes.has(e.to);
+    });
+
+    let nodes = allNodes.filter(n => allowedNodes.has(n.id));
+
+    // Hide isolated nodes (but keep pinned)
+    if (hideIso) {
+      const connected = new Set();
+      edges.forEach(e => { 
+        connected.add(e.from); 
+        connected.add(e.to); 
+      });
+      pinnedNodes.forEach(id => connected.add(String(id))); // Keep pinned nodes
+      if (selectedNodeId) connected.add(String(selectedNodeId)); // Keep selected node
+      nodes = nodes.filter(n => connected.has(n.id));
+    }
+
+    // Apply group styles
+    nodes = applyGroupStyle(nodes);
+    
+    // Apply pinned node styles
+    nodes = applyPinnedNodes(nodes);
+
+    const signature = JSON.stringify({
+      nodes: nodes.map(n => `${n.id}:${markData.nodeToGroup[n.id] || ""}:${pinnedNodes.has(n.id) ? "p" : ""}`),
+      edges: edges.map(e => e.id),
+      display: displayNickname && displayNickname.checked ? "nick" : "name"
+    });
+
+    return {
+      nodes,
+      edges,
+      signature
+    };
+  }
+
+  /**
+   * Get vis-network options
+   */
+  function getNetworkOptions() {
+    return {
+      physics: {
+        enabled: usePhysics,
+        solver: "barnesHut",
+        stabilization: { iterations: 200, updateInterval: 20 },
+        barnesHut: { 
+          gravitationalConstant: -12000, 
+          springLength: 100, 
+          springConstant: 0.012, 
+          damping: 0.4 
+        },
+        minVelocity: 1,
+        maxVelocity: 30
+      },
+      nodes: {
+        shape: "dot",
+        size: 8,
+        font: { color: "#e7eaf0", size: 24 },
+        borderWidth: 1,
+        color: { border: "#2b3240", background: "#1f2430" }
+      },
+      edges: {
+        smooth: false,
+        font: { size: 10, color: "#9aa3b2" }
+      },
+      interaction: {
+        hover: false,
+        navigationButtons: false
+      }
+    };
+  }
+
+  /**
+   * Apply filters and render graph (Phase 5 - with double-click pin)
+   */
+  function applyFilters() {
+    const graph = computeGraph();
+    if (!graph) return;
+
+    const { nodes, edges, signature } = graph;
+    
+    // Skip if nothing changed
+    if (signature === currentGraphSignature) return;
+
+    const data = {
+      nodes: new vis.DataSet(nodes),
+      edges: new vis.DataSet(edges)
+    };
+
+    const graphContainer = shadowRoot.getElementById('graph');
+    if (!graphContainer) return;
+
+    if (network) {
+      network.setData(data);
+      network.setOptions({ physics: { enabled: usePhysics } });
+    } else {
+      const options = getNetworkOptions();
+      network = new vis.Network(graphContainer, data, options);
+      
+      // Node selection event
+      network.on("selectNode", params => {
+        const nodeId = params.nodes[0];
+        selectedNodeId = nodeId;
+        showDetail(nodeId);
+      });
+
+      // Node deselection event
+      network.on("deselectNode", () => {
+        selectedNodeId = null;
+        hideDetail();
+      });
+
+      // Double-click to pin/unpin nodes
+      network.on("doubleClick", params => {
+        if (params.nodes.length > 0) {
+          const nodeId = String(params.nodes[0]);
+          if (pinnedNodes.has(nodeId)) {
+            pinnedNodes.delete(nodeId);
+            console.log('[BC-Bio-Visualizer] Node unpinned:', nodeId);
+          } else {
+            pinnedNodes.add(nodeId);
+            console.log('[BC-Bio-Visualizer] Node pinned:', nodeId);
+          }
+          saveMarkData();
+          renderPinnedList();
+          invalidateGraph();
+        }
+      });
+
+      console.log('[BC-Bio-Visualizer] Network initialized with pin support');
+    }
+
+    // Auto-fit on first render
+    if (nodes.length && !currentGraphSignature) {
+      setTimeout(() => {
+        if (network) network.fit({ animation: false });
+      }, 100);
+    }
+
+    currentGraphSignature = signature;
+
+    // Disable physics after stabilization if enabled
+    if (usePhysics && network) {
+      network.once("stabilizationIterationsDone", () => {
+        network.setOptions({ physics: { enabled: false } });
+        usePhysics = false;
+        updatePhysicsButton();
+      });
+    }
+
+    // Render filtered list (Phase 6)
+    renderFilteredList(nodes);
+
+    // Update statistics
+    updateStatistics();
+  }
+
+  /**
+   * Render filtered member list (Phase 6)
+   */
+  function renderFilteredList(nodes) {
+    const filteredList = shadowRoot.getElementById('filteredList');
+    if (!filteredList) return;
+
+    if (!nodes || nodes.length === 0) {
+      filteredList.innerHTML = '<div class="muted" style="font-size:12px;">没有匹配项</div>';
+      return;
+    }
+
+    const sorted = [...nodes].sort((a, b) => {
+      const aLabel = a.label || "";
+      const bLabel = b.label || "";
+      return aLabel.localeCompare(bLabel);
+    });
+
+    // Limit display to first 50 for performance
+    const displayed = sorted.slice(0, 50);
+    const remaining = sorted.length - 50;
+
+    filteredList.innerHTML = displayed.map(n => {
+      const label = safeText(n.label || n.id);
+      return `<div style="font-size:11px;padding:2px 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" data-id="${n.id}" class="filtered-item">${label}</div>`;
+    }).join('') + (remaining > 0 ? `<div class="muted" style="font-size:11px;padding:4px 0;">还有 ${remaining} 个成员...</div>` : '');
+
+    // Add click handlers to jump to node
+    filteredList.querySelectorAll('.filtered-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const nodeId = item.dataset.id;
+        if (network && nodeId) {
+          network.selectNodes([nodeId]);
+          network.focus(nodeId, { scale: 1.5, animation: true });
+          selectedNodeId = nodeId;
+          showDetail(nodeId);
+        }
+      });
+    });
+  }
+
+  /**
+   * Update statistics display (Phase 6)
+   */
+  function updateStatistics() {
+    const statMembers = shadowRoot.getElementById('statMembers');
+    const statOwnership = shadowRoot.getElementById('statOwnership');
+    const statLovership = shadowRoot.getElementById('statLovership');
+
+    if (statMembers) statMembers.textContent = rawMembers.length;
+    if (statOwnership) statOwnership.textContent = allEdges.filter(e => e.dataType === 'ownership').length;
+    if (statLovership) statLovership.textContent = allEdges.filter(e => e.dataType === 'lovership').length;
+  }
+
+  /**
+   * Render pinned nodes list
+   */
+  function renderPinnedList() {
+    const fixedList = shadowRoot.getElementById('fixedList');
+    if (!fixedList) return;
+
+    if (pinnedNodes.size === 0) {
+      fixedList.innerHTML = '<div class="muted" style="font-size:12px;">无固定节点</div>';
+      return;
+    }
+
+    const pinnedArray = Array.from(pinnedNodes).map(id => {
+      const m = membersById.get(String(id));
+      if (!m) return `未知 (#${id})`;
+      const displayNickname = shadowRoot.getElementById('displayNickname');
+      const name = (displayNickname && displayNickname.checked && m.nickname) ? m.nickname : (m.name || '未知');
+      return `${name} (#${id})`;
+    }).sort();
+
+    fixedList.innerHTML = pinnedArray.map(label => `<div style="font-size:12px;">${label}</div>`).join('');
+  }
+
+  /**
+   * Render group select UI (Phase 6)
+   */
+  function renderGroupSelect(nodeId) {
+    const groupSelectList = shadowRoot.getElementById('groupSelectList');
+    const groupSearch = shadowRoot.getElementById('groupSearch');
+    if (!groupSelectList || !groupSearch) return;
+
+    const groupEntries = Object.entries(markData.groups)
+      .map(([id, g]) => ({ id, name: g.name || id }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    const query = groupSearch.value.trim().toLowerCase();
+    const currentGroupId = markData.nodeToGroup[String(nodeId)] || "";
+    const filteredEntries = groupEntries.filter(g => !query || g.name.toLowerCase().includes(query));
+    
+    if (!focusedGroupId || !markData.groups[focusedGroupId]) {
+      focusedGroupId = currentGroupId || null;
+    }
+    
+    let html = '';
+    
+    if (!filteredEntries.length && !groupEntries.length) {
+      html = '<div class="muted" style="padding:8px;font-size:12px;">没有分组</div>';
+    } else if (!filteredEntries.length) {
+      html = '<div class="muted" style="padding:8px;font-size:12px;">没有匹配项</div>';
+    } else {
+      html = filteredEntries.map(g => {
+        const checked = g.id === currentGroupId ? 'checked' : '';
+        const disabled = editingGroupId === g.id ? 'disabled' : '';
+        const isEditing = editingGroupId === g.id ? 'is-editing' : '';
+        
+        if (editingGroupId === g.id) {
+          return `
+            <div class="select-item ${isEditing}" data-id="${g.id}">
+              <input type="radio" name="groupRadio" ${checked} ${disabled} />
+              <input type="text" class="item-input" value="${safeText(g.name)}" data-original="${safeText(g.name)}" />
+              <div class="item-actions">
+                <button class="icon-btn save" title="保存" data-action="save">✓</button>
+                <button class="icon-btn" title="取消" data-action="cancel">✕</button>
+              </div>
+            </div>
+          `;
+        }
+        
+        const isFocused = focusedGroupId === g.id ? 'is-focused' : '';
+        return `
+          <div class="select-item ${isFocused}" data-id="${g.id}">
+            <input type="radio" name="groupRadio" ${checked} />
+            <span class="item-label">${safeText(g.name)}</span>
+            <div class="item-actions">
+              <button class="icon-btn" title="编辑" data-action="edit">✏️</button>
+              <button class="icon-btn delete" title="删除" data-action="delete">🗑️</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    // Add create button
+    if (creatingGroup) {
+      html += `
+        <div class="select-item is-creating" data-creating="true">
+          <span style="width:20px;text-align:center;">+</span>
+          <input type="text" class="item-input" placeholder="分组名称" autofocus />
+          <div class="item-actions">
+            <button class="icon-btn save" title="创建" data-action="create">✓</button>
+            <button class="icon-btn" title="取消" data-action="cancel-create">✕</button>
+          </div>
+        </div>
+      `;
+    } else if (nodeId) {
+      html += '<button class="button create-new-btn" data-action="start-create" style="width:100%;margin-top:8px;">新建分组</button>';
+    }
+    
+    groupSelectList.innerHTML = html;
+    
+    // Auto-focus input if editing or creating
+    if (editingGroupId || creatingGroup) {
+      setTimeout(() => {
+        const input = groupSelectList.querySelector('.item-input');
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      }, 10);
+    }
+  }
+
+  /**
+   * Update mark UI when node is selected (Phase 6)
+   */
+  function updateMarkUI(nodeId) {
+    if (nodeId) {
+      renderGroupSelect(nodeId);
+    }
+  }
+
+  /**
+   * Show node detail
+   */
+  function showDetail(id) {
+    const m = membersById.get(String(id));
+    const detailEmpty = shadowRoot.getElementById('detail-empty');
+    const detail = shadowRoot.getElementById('detail');
+    const detailName = shadowRoot.getElementById('detailName');
+    const detailMeta = shadowRoot.getElementById('detailMeta');
+    const detailOwnership = shadowRoot.getElementById('detailOwnership');
+    const detailLovership = shadowRoot.getElementById('detailLovership');
+    const detailDesc = shadowRoot.getElementById('detailDesc');
+
+    if (!m) {
+      if (detailName) detailName.textContent = `未知 (#${id})`;
+      if (detailMeta) detailMeta.textContent = "无数据";
+      if (detailOwnership) detailOwnership.textContent = "-";
+      if (detailLovership) detailLovership.textContent = "-";
+      if (detailDesc) detailDesc.textContent = "无描述";
+    } else {
+      const displayNickname = shadowRoot.getElementById('displayNickname');
+      const name = (displayNickname && displayNickname.checked && m.nickname) ? m.nickname : (m.name || '未知');
+      
+      if (detailName) detailName.textContent = `${name} (#${m.memberNumber})`;
+      if (detailMeta) detailMeta.textContent = [m.title, m.nickname, m.assetFamily].filter(Boolean).join(" | ");
+      
+      if (detailOwnership) {
+        if (m.ownership && m.ownership.MemberNumber !== undefined) {
+          detailOwnership.textContent = `${m.ownership.Name || "未知"} (#${m.ownership.MemberNumber})`;
+        } else {
+          detailOwnership.textContent = "-";
+        }
+      }
+      
+      if (detailLovership) {
+        if (Array.isArray(m.lovership) && m.lovership.length) {
+          detailLovership.textContent = m.lovership
+            .map(l => `${l.Name || "未知"}${l.MemberNumber !== undefined ? ` (#${l.MemberNumber})` : ""}`)
+            .join(", ");
+        } else {
+          detailLovership.textContent = "-";
+        }
+      }
+      
+      if (detailDesc) detailDesc.textContent = m.descriptionDecoded || "无描述";
+    }
+
+    if (detailEmpty) detailEmpty.style.display = "none";
+    if (detail) detail.style.display = "flex";
+
+    // Update group UI
+    updateMarkUI(id);
+  }
+
+  /**
+   * Hide detail panel
+   */
+  function hideDetail() {
+    const detailEmpty = shadowRoot.getElementById('detail-empty');
+    const detail = shadowRoot.getElementById('detail');
+    
+    if (detail) detail.style.display = "none";
+    if (detailEmpty) detailEmpty.style.display = "block";
+  }
+
+  /**
+   * Update physics button text
+   */
+  function updatePhysicsButton() {
+    const physicsToggleBtn = shadowRoot.getElementById('physicsToggleBtn');
+    if (physicsToggleBtn) {
+      physicsToggleBtn.textContent = usePhysics ? '停止物理' : '开始物理';
     }
   }
 
@@ -1026,6 +2246,13 @@
       // ESC to close
       if (e.key === 'Escape' && isVisualizerVisible) {
         hideVisualizer();
+      }
+
+      // Space to toggle physics (when visualizer is open)
+      if (e.code === 'Space' && isVisualizerVisible && !e.target.matches('input, textarea')) {
+        e.preventDefault();
+        const physicsToggleBtn = shadowRoot.getElementById('physicsToggleBtn');
+        if (physicsToggleBtn) physicsToggleBtn.click();
       }
     });
   }
