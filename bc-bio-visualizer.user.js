@@ -57,6 +57,81 @@
   let networkInitialized = false;
 
   // ============================================================================
+  // DEVICE & SCREEN DETECTION
+  // ============================================================================
+
+  const DeviceDetector = {
+    _isMobile: null,
+    _screenSize: 'large', // 'small' | 'medium' | 'large'
+    _listeners: [],
+
+    /**
+     * Detect if the device is mobile via UA + touch capability
+     */
+    isMobile() {
+      if (this._isMobile === null) {
+        const ua = navigator.userAgent || '';
+        const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|Tablet/i.test(ua);
+        const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const smallScreen = window.innerWidth <= 1024;
+        this._isMobile = (mobileUA && hasTouch) || (hasTouch && smallScreen);
+      }
+      return this._isMobile;
+    },
+
+    /**
+     * Get current screen size category
+     */
+    getScreenSize() {
+      const w = window.innerWidth;
+      if (w <= 600) return 'small';      // phone
+      if (w <= 1024) return 'medium';    // tablet
+      return 'large';                     // desktop
+    },
+
+    /**
+     * Check if current layout should be compact (mobile-style)
+     */
+    isCompact() {
+      return this.isMobile() || this.getScreenSize() !== 'large';
+    },
+
+    /**
+     * Register a layout change listener
+     */
+    onChange(callback) {
+      this._listeners.push(callback);
+    },
+
+    /**
+     * Initialize resize/orientation listeners
+     */
+    init() {
+      this._screenSize = this.getScreenSize();
+
+      const handleResize = debounce(() => {
+        // Re-evaluate mobile on resize (e.g. desktop resize to narrow)
+        this._isMobile = null;
+        const newSize = this.getScreenSize();
+        const changed = newSize !== this._screenSize;
+        this._screenSize = newSize;
+        if (changed) {
+          this._listeners.forEach(cb => cb({
+            isMobile: this.isMobile(),
+            screenSize: newSize,
+            isCompact: this.isCompact()
+          }));
+        }
+      }, 250);
+
+      window.addEventListener('resize', handleResize);
+      window.addEventListener('orientationchange', () => {
+        setTimeout(handleResize, 300); // delay for orientation to settle
+      });
+    }
+  };
+
+  // ============================================================================
   // UTILITY FUNCTIONS
   // ============================================================================
 
@@ -486,11 +561,21 @@
   async function showVisualizer() {
     rootContainer.style.display = 'block';
     isVisualizerVisible = true;
+
+    // Prevent page scrolling while visualizer is open on mobile
+    if (DeviceDetector.isCompact()) {
+      document.body.style.overflow = 'hidden';
+    }
     
     if (!networkInitialized) {
       showLoadingOverlay('初始化中...');
       await initializeVisualizerUI();
       hideLoadingOverlay();
+    }
+
+    // Re-fit graph on show (new screen size may differ)
+    if (network) {
+      setTimeout(() => network.redraw(), 100);
     }
   }
 
@@ -500,6 +585,12 @@
   function hideVisualizer() {
     rootContainer.style.display = 'none';
     isVisualizerVisible = false;
+    document.body.style.overflow = '';
+
+    // Close mobile panels
+    if (typeof window._bcBioCloseMobilePanel === 'function') {
+      window._bcBioCloseMobilePanel();
+    }
   }
 
   // ============================================================================
@@ -608,6 +699,7 @@
         display: grid;
         grid-template-rows: auto 1fr;
         overflow: hidden;
+        position: relative;
       }
 
       header {
@@ -1322,16 +1414,273 @@
         }
       }
 
-      @media (max-width: 1200px) {
+      /* =============== MOBILE / RESPONSIVE =============== */
+
+      /* Mobile overlay panels */
+      .mobile-nav {
+        display: none;
+        position: absolute;
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 100;
+        background: rgba(23, 26, 33, 0.92);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 6px 10px;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .mobile-nav .mobile-nav-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: transparent;
+        border: 1px solid transparent;
+        color: var(--muted);
+        font-size: 20px;
+        cursor: pointer;
+        transition: all 0.2s;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .mobile-nav .mobile-nav-btn.is-active {
+        background: rgba(106, 201, 255, 0.15);
+        color: var(--accent);
+        border-color: rgba(106, 201, 255, 0.3);
+      }
+
+      .mobile-nav .mobile-nav-btn:active {
+        transform: scale(0.92);
+      }
+
+      /* Panel overlay mode for mobile */
+      .panel-overlay {
+        display: none;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 85vw;
+        max-width: 360px;
+        z-index: 90;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        transition: transform 0.3s cubic-bezier(.4,0,.2,1);
+        padding: 16px;
+      }
+
+      .panel-overlay.panel-left {
+        left: 0;
+        border-radius: 0 16px 16px 0;
+        transform: translateX(-100%);
+      }
+
+      .panel-overlay.panel-right {
+        right: 0;
+        border-radius: 16px 0 0 16px;
+        transform: translateX(100%);
+      }
+
+      .panel-overlay.is-open {
+        display: block;
+        transform: translateX(0);
+      }
+
+      .panel-backdrop {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 80;
+      }
+
+      .panel-backdrop.is-open {
+        display: block;
+      }
+
+      /* Mobile close button for panels */
+      .panel-close-btn {
+        display: none;
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 18px;
+        cursor: pointer;
+        align-items: center;
+        justify-content: center;
+        z-index: 5;
+      }
+
+      /* --- Small screens (phones) --- */
+      @media (max-width: 600px) {
+        header {
+          flex-wrap: wrap;
+          padding: 8px 10px;
+          gap: 6px;
+        }
+
+        header h1 {
+          font-size: 13px;
+          flex: 0 0 auto;
+        }
+
+        .pill {
+          font-size: 10px;
+          padding: 1px 5px;
+          order: 2;
+        }
+
+        .toolbar {
+          order: 3;
+          width: 100%;
+          flex-wrap: wrap;
+          gap: 4px;
+          margin-left: 0;
+        }
+
+        .toolbar .button {
+          font-size: 11px;
+          padding: 6px 8px;
+          flex: 1 1 auto;
+          min-width: 0;
+          text-align: center;
+        }
+
         main {
           grid-template-columns: 1fr;
-          grid-template-rows: auto 1fr 280px;
+          grid-template-rows: 1fr;
+          padding: 0;
+          gap: 0;
+          position: relative;
         }
-        .splitter {
+
+        .splitter { display: none; }
+
+        #left-panel,
+        #detail-panel {
           display: none;
         }
+
+        #graph {
+          border-radius: 0;
+          border: none;
+          min-height: 200px;
+        }
+
+        .mobile-nav { display: flex; }
+        .panel-close-btn { display: flex; }
+
+        .toast-container {
+          bottom: 80px;
+          right: 12px;
+          left: 12px;
+        }
+
+        .toast {
+          min-width: auto;
+          max-width: none;
+          font-size: 12px;
+        }
+      }
+
+      /* --- Medium screens (tablets) --- */
+      @media (min-width: 601px) and (max-width: 1024px) {
+        header {
+          padding: 8px 12px;
+          gap: 8px;
+        }
+
+        header h1 {
+          font-size: 14px;
+        }
+
+        .toolbar {
+          flex-wrap: wrap;
+          gap: 4px;
+        }
+
+        .toolbar .button {
+          font-size: 11px;
+          padding: 5px 8px;
+        }
+
+        main {
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr;
+          padding: 0;
+          gap: 0;
+          position: relative;
+        }
+
+        .splitter { display: none; }
+
+        #left-panel,
         #detail-panel {
-          grid-column: 1 / -1;
+          display: none;
+        }
+
+        #graph {
+          border-radius: 0;
+          border: none;
+        }
+
+        .mobile-nav { display: flex; }
+        .panel-close-btn { display: flex; }
+      }
+
+      /* Large screens keep the default 3-column layout */
+      @media (min-width: 1025px) {
+        .mobile-nav { display: none; }
+        .panel-overlay { display: none !important; }
+        .panel-backdrop { display: none !important; }
+        .panel-close-btn { display: none; }
+      }
+
+      /* Touch optimizations */
+      @media (pointer: coarse) {
+        .button, select, .icon-btn, .select-item, .mobile-nav-btn {
+          min-height: 40px;
+        }
+
+        .checkbox-row {
+          min-height: 36px;
+          gap: 10px;
+        }
+
+        input[type="checkbox"], input[type="radio"] {
+          width: 20px;
+          height: 20px;
+        }
+
+        .select-item .item-actions {
+          opacity: 1;
+        }
+
+        .filtered-item, .circle-select-item, .group-select-item {
+          min-height: 36px;
+          padding: 6px 8px;
+        }
+
+        .stat {
+          padding: 6px 0;
         }
       }
     `;
@@ -1514,9 +1863,188 @@
           </div>
         </section>
       </main>
+
+      <div class="mobile-nav" id="mobileNav">
+        <button class="mobile-nav-btn" id="mobileLeftBtn" title="筛选面板">☰</button>
+        <button class="mobile-nav-btn" id="mobileFitBtn" title="适配视图">⊞</button>
+        <button class="mobile-nav-btn" id="mobileExtractBtn" title="提取数据">⟳</button>
+        <button class="mobile-nav-btn" id="mobileRightBtn" title="详情面板">☷</button>
+        <button class="mobile-nav-btn" id="mobileCloseBtn" title="关闭" style="color:#ff6b6b;">✕</button>
+      </div>
+
+      <div class="panel-backdrop" id="panelBackdrop"></div>
+      <div class="panel-overlay panel-left" id="mobileLeftPanel">
+        <button class="panel-close-btn" id="closeMobileLeft">✕</button>
+      </div>
+      <div class="panel-overlay panel-right" id="mobileRightPanel">
+        <button class="panel-close-btn" id="closeMobileRight">✕</button>
+      </div>
     `;
     
     shadowRoot.appendChild(container);
+
+    // Setup mobile panel system
+    setupMobilePanels();
+  }
+
+  // ============================================================================
+  // MOBILE PANEL SYSTEM
+  // ============================================================================
+
+  /**
+   * Setup mobile panels: clone left/right panel content into overlay panels,
+   * wire up navigation buttons, backdrop, and swipe gestures.
+   */
+  function setupMobilePanels() {
+    if (!DeviceDetector.isCompact()) return;
+
+    const leftPanel = shadowRoot.getElementById('left-panel');
+    const detailPanel = shadowRoot.getElementById('detail-panel');
+    const mobileLeftPanel = shadowRoot.getElementById('mobileLeftPanel');
+    const mobileRightPanel = shadowRoot.getElementById('mobileRightPanel');
+    const panelBackdrop = shadowRoot.getElementById('panelBackdrop');
+
+    // Move panel contents to overlay panels on mobile
+    if (leftPanel && mobileLeftPanel) {
+      // Clone all children from left-panel into mobileLeftPanel (after close btn)
+      Array.from(leftPanel.children).forEach(child => {
+        mobileLeftPanel.appendChild(child);
+      });
+    }
+
+    if (detailPanel && mobileRightPanel) {
+      Array.from(detailPanel.children).forEach(child => {
+        mobileRightPanel.appendChild(child);
+      });
+    }
+
+    // Mobile nav buttons
+    const mobileLeftBtn = shadowRoot.getElementById('mobileLeftBtn');
+    const mobileRightBtn = shadowRoot.getElementById('mobileRightBtn');
+    const mobileFitBtn = shadowRoot.getElementById('mobileFitBtn');
+    const mobileExtractBtn = shadowRoot.getElementById('mobileExtractBtn');
+    const mobileCloseBtn = shadowRoot.getElementById('mobileCloseBtn');
+    const closeMobileLeft = shadowRoot.getElementById('closeMobileLeft');
+    const closeMobileRight = shadowRoot.getElementById('closeMobileRight');
+
+    function openMobilePanel(side) {
+      closeMobilePanel(); // close any open panel first
+      if (side === 'left' && mobileLeftPanel) {
+        mobileLeftPanel.classList.add('is-open');
+        mobileLeftOpen = true;
+        if (mobileLeftBtn) mobileLeftBtn.classList.add('is-active');
+      } else if (side === 'right' && mobileRightPanel) {
+        mobileRightPanel.classList.add('is-open');
+        mobileRightOpen = true;
+        if (mobileRightBtn) mobileRightBtn.classList.add('is-active');
+      }
+      if (panelBackdrop) panelBackdrop.classList.add('is-open');
+    }
+
+    function closeMobilePanel() {
+      if (mobileLeftPanel) mobileLeftPanel.classList.remove('is-open');
+      if (mobileRightPanel) mobileRightPanel.classList.remove('is-open');
+      if (panelBackdrop) panelBackdrop.classList.remove('is-open');
+      mobileLeftOpen = false;
+      mobileRightOpen = false;
+      if (mobileLeftBtn) mobileLeftBtn.classList.remove('is-active');
+      if (mobileRightBtn) mobileRightBtn.classList.remove('is-active');
+    }
+
+    // Make closeMobilePanel available globally
+    window._bcBioCloseMobilePanel = closeMobilePanel;
+
+    if (mobileLeftBtn) {
+      mobileLeftBtn.addEventListener('click', () => {
+        if (mobileLeftOpen) { closeMobilePanel(); } else { openMobilePanel('left'); }
+      });
+    }
+
+    if (mobileRightBtn) {
+      mobileRightBtn.addEventListener('click', () => {
+        if (mobileRightOpen) { closeMobilePanel(); } else { openMobilePanel('right'); }
+      });
+    }
+
+    if (mobileFitBtn) {
+      mobileFitBtn.addEventListener('click', () => {
+        if (network) network.fit({ animation: true, animationDuration: 500 });
+      });
+    }
+
+    if (mobileExtractBtn) {
+      mobileExtractBtn.addEventListener('click', () => {
+        const extractBtn = shadowRoot.getElementById('extractBtn');
+        if (extractBtn) extractBtn.click();
+      });
+    }
+
+    if (mobileCloseBtn) {
+      mobileCloseBtn.addEventListener('click', hideVisualizer);
+    }
+
+    if (closeMobileLeft) {
+      closeMobileLeft.addEventListener('click', closeMobilePanel);
+    }
+
+    if (closeMobileRight) {
+      closeMobileRight.addEventListener('click', closeMobilePanel);
+    }
+
+    if (panelBackdrop) {
+      panelBackdrop.addEventListener('click', closeMobilePanel);
+    }
+
+    // Swipe gesture support
+    setupSwipeGestures(mobileLeftPanel, mobileRightPanel, closeMobilePanel);
+  }
+
+  /**
+   * Setup swipe gestures on overlay panels for swipe-to-close
+   */
+  function setupSwipeGestures(leftPanel, rightPanel, closeCallback) {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const SWIPE_THRESHOLD = 60;
+
+    function handleTouchStart(e) {
+      const touch = e.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+    }
+
+    function handleTouchEnd(e, side) {
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = Math.abs(touch.clientY - touchStartY);
+
+      // Only trigger if horizontal swipe > threshold and mostly horizontal
+      if (dy < Math.abs(dx) && Math.abs(dx) > SWIPE_THRESHOLD) {
+        if (side === 'left' && dx < 0) {
+          closeCallback();
+        } else if (side === 'right' && dx > 0) {
+          closeCallback();
+        }
+      }
+    }
+
+    if (leftPanel) {
+      leftPanel.addEventListener('touchstart', handleTouchStart, { passive: true });
+      leftPanel.addEventListener('touchend', (e) => handleTouchEnd(e, 'left'), { passive: true });
+    }
+
+    if (rightPanel) {
+      rightPanel.addEventListener('touchstart', handleTouchStart, { passive: true });
+      rightPanel.addEventListener('touchend', (e) => handleTouchEnd(e, 'right'), { passive: true });
+    }
+  }
+
+  /**
+   * Get the correct parent element for a given selector on both mobile and desktop.
+   * On mobile, elements may live inside overlay panels instead of the original panel.
+   */
+  function getMobileAwareElement(id) {
+    return shadowRoot.getElementById(id);
   }
 
   /**
@@ -2425,6 +2953,26 @@
     
     document.addEventListener("mousemove", handleSplitterMove);
     document.addEventListener("mouseup", endSplitterDrag);
+
+    // --- Touch support for splitters ---
+    if (splitterLeft) {
+      splitterLeft.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        beginSplitterDrag("left");
+      }, { passive: false });
+    }
+    if (splitterRight) {
+      splitterRight.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+        beginSplitterDrag("right");
+      }, { passive: false });
+    }
+    document.addEventListener("touchmove", (e) => {
+      if (!isDraggingSplitter) return;
+      const touch = e.touches[0];
+      if (touch) handleSplitterMove(touch);
+    }, { passive: true });
+    document.addEventListener("touchend", endSplitterDrag);
   }
 
   // ============================================================================
@@ -2449,6 +2997,10 @@
   let currentNodeDataSet = null;
   let currentEdgeDataSet = null;
   let lastRenderedSelectedNodeId = null;
+
+  // Mobile panel state
+  let mobileLeftOpen = false;
+  let mobileRightOpen = false;
 
   // Mark data structure
   const MARK_DATA_VERSION = 2;
@@ -3550,14 +4102,15 @@
    * Get vis-network options
    */
   function getNetworkOptions() {
+    const compact = DeviceDetector.isCompact();
     return {
       physics: {
         enabled: true,
         solver: "barnesHut",
-        stabilization: { iterations: 200, updateInterval: 20 },
+        stabilization: { iterations: compact ? 120 : 200, updateInterval: 20 },
         barnesHut: { 
-          gravitationalConstant: -12000, 
-          springLength: 100, 
+          gravitationalConstant: compact ? -8000 : -12000, 
+          springLength: compact ? 80 : 100, 
           springConstant: 0.012, 
           damping: 0.4 
         },
@@ -3566,18 +4119,20 @@
       },
       nodes: {
         shape: "dot",
-        size: 8,
-        font: { color: "#e7eaf0", size: 24 },
+        size: compact ? 10 : 8,
+        font: { color: "#e7eaf0", size: compact ? 18 : 24 },
         borderWidth: 1,
         color: { border: "#2b3240", background: "#1f2430" }
       },
       edges: {
         smooth: false,
-        font: { size: 10, color: "#9aa3b2" }
+        font: { size: compact ? 8 : 10, color: "#9aa3b2" }
       },
       interaction: {
         hover: false,
-        navigationButtons: false
+        navigationButtons: false,
+        zoomSpeed: compact ? 0.6 : 1,
+        dragView: true
       }
     };
   }
@@ -3695,6 +4250,26 @@
         useIncrementalUpdate = true;
         applyFilters();
         useIncrementalUpdate = false;
+
+        // On mobile, auto-open the detail panel
+        if (DeviceDetector.isCompact()) {
+          const mobileRightPanel = shadowRoot.getElementById('mobileRightPanel');
+          const panelBackdrop = shadowRoot.getElementById('panelBackdrop');
+          const mobileRightBtn = shadowRoot.getElementById('mobileRightBtn');
+          if (mobileRightPanel) {
+            // Close left panel if open
+            const mobileLeftPanel = shadowRoot.getElementById('mobileLeftPanel');
+            const mobileLeftBtn = shadowRoot.getElementById('mobileLeftBtn');
+            if (mobileLeftPanel) mobileLeftPanel.classList.remove('is-open');
+            if (mobileLeftBtn) mobileLeftBtn.classList.remove('is-active');
+            mobileLeftOpen = false;
+
+            mobileRightPanel.classList.add('is-open');
+            mobileRightOpen = true;
+            if (panelBackdrop) panelBackdrop.classList.add('is-open');
+            if (mobileRightBtn) mobileRightBtn.classList.add('is-active');
+          }
+        }
       });
 
       // Node deselection event — only deselect when switching to another node
@@ -4334,6 +4909,21 @@
       console.warn('[BC-Bio-Visualizer] Continuing with limited functionality...');
       // Don't return - allow the UI to load, but graph won't work
     }
+
+    // Initialize device detector
+    DeviceDetector.init();
+    console.log('[BC-Bio-Visualizer] Device:', DeviceDetector.isMobile() ? 'Mobile' : 'Desktop',
+      '| Screen:', DeviceDetector.getScreenSize(),
+      '| Compact:', DeviceDetector.isCompact());
+
+    // Listen for layout changes and adapt UI
+    DeviceDetector.onChange(({ isMobile, screenSize, isCompact }) => {
+      console.log('[BC-Bio-Visualizer] Layout changed:', { isMobile, screenSize, isCompact });
+      if (isVisualizerVisible && network) {
+        // Re-fit the graph when layout changes
+        setTimeout(() => network.fit({ animation: true, animationDuration: 300 }), 350);
+      }
+    });
 
     // Create Shadow DOM container
     createShadowContainer();

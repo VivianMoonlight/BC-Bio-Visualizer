@@ -5,6 +5,26 @@ All notable changes to BC-Bio-Visualizer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-02-14
+
+### Added
+
+#### Mobile & Responsive UI
+- **Device Detection**: Automatic desktop/mobile detection via UA + touch + screen size
+- **Screen Size Categories**: Three breakpoints — small (≤600px), medium (601-1024px), large (>1024px)
+- **Mobile Navigation Bar**: Floating bottom nav with filter, fit, extract, detail, and close buttons
+- **Slide-in Overlay Panels**: Left (filters) and right (details) panels slide in as overlays on mobile
+- **Panel Backdrop**: Semi-transparent backdrop behind overlay panels with tap-to-close
+- **Swipe Gestures**: Swipe-to-close on overlay panels (left swipe closes left panel, right swipe closes right panel)
+- **Auto Detail Panel**: Tapping a node on mobile auto-opens the detail panel overlay
+- **Touch-optimized Controls**: Larger tap targets (40px min), bigger checkboxes/radios (20px), always-visible action buttons
+- **Orientation Change Handling**: Layout adapts on device rotation with debounced resize detection
+- **Compact Graph Options**: Smaller node labels, adjusted physics, and slower zoom on mobile
+- **Scroll Lock**: Prevents background page scrolling when visualizer is open on mobile
+- **Touch Splitter Support**: Touch events for panel splitters (on tablet landscape)
+- **Responsive Header**: Toolbar wraps and buttons auto-size on narrow screens
+- **Dynamic Layout Change Listener**: `DeviceDetector.onChange()` callback for runtime adaptation
+
 ## [2.0.0] - 2026-02-13
 
 ### 🎉 Major Release - Tampermonkey Migration
