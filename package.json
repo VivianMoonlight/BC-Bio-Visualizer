@@ -1,0 +1,41 @@
+{
+  "name": "bc-bio-visualizer",
+  "version": "2.0.0",
+  "description": "WCE生物数据库可视化工具 - Tampermonkey版本",
+  "main": "bc-bio-visualizer.user.js",
+  "scripts": {
+    "lint": "echo 'No linter configured'",
+    "test": "echo 'No tests configured'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-repo/BC-Bio-Visualizer.git"
+  },
+  "keywords": [
+    "tampermonkey",
+    "userscript",
+    "visualization",
+    "graph",
+    "bc",
+    "bondage-club"
+  ],
+  "author": "BC-Bio-Visualizer Team",
+  "license": "SEE LICENSE FILE",
+  "bugs": {
+    "url": "https://github.com/your-repo/BC-Bio-Visualizer/issues"
+  },
+  "homepage": "https://github.com/your-repo/BC-Bio-Visualizer#readme",
+  "dependencies": {},
+  "devDependencies": {},
+  "files": [
+    "bc-bio-visualizer.user.js",
+    "loader.js",
+    "README.md",
+    "QUICKREF.md",
+    "ARCHITECTURE.md",
+    "INSTALL.md",
+    "RELEASE_NOTES.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ]
+}
