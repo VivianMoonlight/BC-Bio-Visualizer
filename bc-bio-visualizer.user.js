@@ -1851,7 +1851,9 @@
   let circleMembersByNode = new Map();
   let circleFilterSelected = new Set();
   let isRerendering = false; // guard against setData-triggered deselect
+  let isSelectionChange = false; // flag for selection-triggered re-render (no physics/fit)
   let currentNodeDataSet = null;
+  let currentEdgeDataSet = null;
   let lastRenderedSelectedNodeId = null;
 
   // Mark data structure
@@ -2638,6 +2640,36 @@
       return;
     }
 
+    // Selection-triggered structural change: use incremental DataSet updates
+    // to avoid physics re-stabilization, viewport jumps, and flicker
+    if (isSelectionChange && network && currentNodeDataSet && currentEdgeDataSet) {
+      lastRenderedSelectedNodeId = selectedNodeId;
+
+      // Incrementally update nodes
+      const oldNodeIds = new Set(currentNodeDataSet.getIds());
+      const newNodeIds = new Set(nodes.map(n => n.id));
+      const toRemoveNodes = [...oldNodeIds].filter(id => !newNodeIds.has(id));
+      if (toRemoveNodes.length) currentNodeDataSet.remove(toRemoveNodes);
+      currentNodeDataSet.update(nodes);
+
+      // Incrementally update edges
+      const oldEdgeIds = new Set(currentEdgeDataSet.getIds());
+      const newEdgeIds = new Set(edges.map(e => e.id));
+      const toRemoveEdges = [...oldEdgeIds].filter(id => !newEdgeIds.has(id));
+      if (toRemoveEdges.length) currentEdgeDataSet.remove(toRemoveEdges);
+      currentEdgeDataSet.update(edges);
+
+      if (selectedNodeId) {
+        network.selectNodes([selectedNodeId]);
+      }
+
+      currentGraphSignature = signature;
+      renderFilteredList(displayNodes);
+      renderCircleFilters(circleToNodes);
+      updateStatistics();
+      return;
+    }
+
     // Render filtered list and circle filters using displayNodes (excludes hub nodes)
     renderFilteredList(displayNodes);
     renderCircleFilters(circleToNodes);
@@ -2647,9 +2679,10 @@
     const savedScale = network ? network.getScale() : null;
 
     currentNodeDataSet = new vis.DataSet(nodes);
+    currentEdgeDataSet = new vis.DataSet(edges);
     const data = {
       nodes: currentNodeDataSet,
-      edges: new vis.DataSet(edges)
+      edges: currentEdgeDataSet
     };
     lastRenderedSelectedNodeId = selectedNodeId;
 
@@ -2678,7 +2711,9 @@
         const nodeId = params.nodes[0];
         selectedNodeId = nodeId;
         showDetail(nodeId);
+        isSelectionChange = true;
         applyFilters();
+        isSelectionChange = false;
       });
 
       // Node deselection event — only deselect when switching to another node
