@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC-Bio-Visualizer
 // @namespace    https://github.com/VivianMoonlight/BC-Bio-Visualizer
-// @version      2.0.0
+// @version      2.1.0
 // @description  WCE生物数据库可视化工具 - Loader
 // @author       BC-Bio-Visualizer Team
 // @match        https://www.bondageprojects.com/*
