@@ -1760,11 +1760,7 @@
 
           <div class="field">
             <label for="neighborDepth">邻接深度</label>
-            <select id="neighborDepth">
-              <option value="1" selected>1跳</option>
-              <option value="2">2跳</option>
-              <option value="3">3跳</option>
-            </select>
+            <input type="number" id="neighborDepth" min="0" max="1000" value="1" />
           </div>
 
           <div class="field">
