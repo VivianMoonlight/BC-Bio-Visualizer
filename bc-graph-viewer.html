@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>BC 资料图查看器</title>
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <!-- i18n scripts -->
+  <script src="i18n.js"></script>
+  <script src="locales.js"></script>
   <style>
     :root {
       --bg: #0f1115;
@@ -635,7 +638,7 @@
 </head>
 <body>
   <header>
-    <h1>BC 资料图查看器</h1>
+    <h1 id="headerTitle">BC 资料图查看器</h1>
     <span class="pill" id="file-status">未加载文件</span>
     <div class="toolbar">
       <input class="button" type="file" id="fileInput" accept=".json" multiple />
@@ -643,6 +646,10 @@
       <button class="button" id="importMarksBtn">导入分组</button>
       <button class="button button-accent" id="physicsToggleBtn" title="切换物理（空格）">开始物理</button>
       <button class="button" id="fitBtn">适配</button>
+      <select id="languageSelect" class="button" style="margin-left: auto;">
+        <option value="zh_CN">中文</option>
+        <option value="en_US">English</option>
+      </select>
       <input type="file" id="importMarksInput" accept=".json" style="display:none;" />
     </div>
   </header>
@@ -650,33 +657,33 @@
   <main>
     <section class="panel" id="left-panel">
       <div class="field">
-        <label for="search">搜索</label>
+        <label for="search" id="label_search">搜索</label>
         <input type="text" id="search" placeholder="姓名 / 昵称 / ID" />
       </div>
 
       <div class="field">
         <div class="checkbox-row">
           <input type="checkbox" id="displayNickname" />
-          <label for="displayNickname">显示昵称</label>
+          <label for="displayNickname" id="label_display_nickname">显示昵称</label>
         </div>
       </div>
 
       <div class="field">
-        <label for="titleFilter">头衔筛选</label>
+        <label for="titleFilter" id="label_title_filter">头衔筛选</label>
         <select id="titleFilter">
           <option value="">全部</option>
         </select>
       </div>
 
       <div class="field">
-        <label>显示圈子</label>
+        <label id="label_show_circles">显示圈子</label>
         <div class="checkbox-row">
           <input type="checkbox" id="circleFilterEnabled" />
-          <label for="circleFilterEnabled">显示选中圈子</label>
+          <label for="circleFilterEnabled" id="label_show_selected_circles">显示选中圈子</label>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="showCircleOverlay" checked />
-          <label for="showCircleOverlay">显示圈子轮廓</label>
+          <label for="showCircleOverlay" id="label_show_circle_outline">显示圈子轮廓</label>
         </div>
         <div id="circleFilterList" class="circle-filter-list muted" style="font-size:12px;">
           没有圈子
@@ -686,20 +693,20 @@
       <div class="field">
         <div class="checkbox-row">
           <input type="checkbox" id="showOwnership" checked />
-          <label for="showOwnership">显示主仆</label>
+          <label for="showOwnership" id="label_show_ownership">显示主仆</label>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="showLovership" checked />
-          <label for="showLovership">显示恋爱</label>
+          <label for="showLovership" id="label_show_lovership">显示恋爱</label>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="hideIsolated" />
-          <label for="hideIsolated">隐藏孤立</label>
+          <label for="hideIsolated" id="label_hide_isolated">隐藏孤立</label>
         </div>
       </div>
 
       <div class="field">
-        <label for="neighborDepth">邻接深度</label>
+        <label for="neighborDepth" id="label_neighbor_depth">邻接深度</label>
         <select id="neighborDepth">
           <option value="1" selected>1跳</option>
           <option value="2">2跳</option>
@@ -708,25 +715,25 @@
       </div>
 
       <div class="field">
-        <label>统计</label>
-        <div class="stat"><span>成员总数</span><span id="statMembers">0</span></div>
-        <div class="stat"><span>主仆关系数</span><span id="statOwnership">0</span></div>
-        <div class="stat"><span>恋爱关系数</span><span id="statLovership">0</span></div>
+        <label id="label_statistics">统计</label>
+        <div class="stat"><span id="stat_members">成员总数</span><span id="statMembers">0</span></div>
+        <div class="stat"><span id="stat_ownership">主仆关系数</span><span id="statOwnership">0</span></div>
+        <div class="stat"><span id="stat_lovership">恋爱关系数</span><span id="statLovership">0</span></div>
       </div>
 
       <div class="field">
-        <label>筛选成员</label>
+        <label id="label_filter_members">筛选成员</label>
         <div id="filteredList" class="muted" style="font-size:12px;"></div>
       </div>
 
       <div class="field">
-        <label>固定成员</label>
+        <label id="label_fixed_members">固定成员</label>
         <div id="fixedList" class="muted" style="font-size:12px;"></div>
       </div>
 
       <div id="warning" class="muted" style="font-size:12px;"></div>
 
-      <div class="muted" style="font-size:12px;">
+      <div class="muted" style="font-size:12px;" id="hint_usage">
         提示：双击节点固定可见性。按空格切换物理。拖动圈子重排树。
       </div>
     </section>
@@ -743,20 +750,20 @@
         <h2 class="detail-title" id="detailName"></h2>
         <div class="detail-sub" id="detailMeta"></div>
         <div class="field">
-          <label>主仆</label>
+          <label id="label_ownership">主仆</label>
           <div id="detailOwnership" class="muted"></div>
         </div>
         <div class="field">
-          <label>恋爱</label>
+          <label id="label_lovership">恋爱</label>
           <div id="detailLovership" class="muted"></div>
         </div>
         <div class="field" id="groupSection">
           <div class="field-header">
             <button class="collapse-toggle" id="groupToggleBtn" type="button">
               <span class="chevron" aria-hidden="true">v</span>
-              <span>同一人分组</span>
+              <span id="label_same_person_group">同一人分组</span>
             </button>
-            <button class="button" id="groupClearBtn" type="button">清除</button>
+            <button class="button" id="groupClearBtn" type="button" id="btn_clear">清除</button>
           </div>
           <div class="field-body" id="groupSectionBody">
             <div class="group-select-wrap">
@@ -773,7 +780,7 @@
           <div class="field-header">
             <button class="collapse-toggle" id="circleToggleBtn" type="button">
               <span class="chevron" aria-hidden="true">v</span>
-              <span>社交圈</span>
+              <span id="label_social_circle">社交圈</span>
             </button>
           </div>
           <div class="field-body" id="circleSectionBody">
@@ -788,7 +795,7 @@
         </div>
 
         <div class="field detail-description">
-          <label>描述</label>
+          <label id="label_description">描述</label>
           <pre id="detailDesc"></pre>
         </div>
 
@@ -797,6 +804,120 @@
   </main>
 
   <script>
+    // ============================================================================
+    // i18n Initialization
+    // ============================================================================
+    i18n.init();
+    
+    // 处理语言选择器
+    const languageSelect = document.getElementById('languageSelect');
+    if (languageSelect) {
+      languageSelect.value = i18n.getLanguage();
+      languageSelect.addEventListener('change', function(e) {
+        i18n.setLanguage(e.target.value);
+        updateAllUI();
+      });
+    }
+    
+    /**
+     * 更新所有UI文本
+     */
+    function updateAllUI() {
+      // 页面标题
+      document.title = i18n.t('page_title');
+      document.getElementById('headerTitle').textContent = i18n.t('main_title');
+      
+      // 按钮和标签
+      document.getElementById('exportMarksBtn').textContent = i18n.t('button_export');
+      document.getElementById('importMarksBtn').textContent = i18n.t('button_import');
+      updatePhysicsButtonText();
+      document.getElementById('fitBtn').textContent = '适配'; // keep as-is for now
+      
+      // 左侧面板标签
+      if (document.getElementById('label_search')) {
+        document.getElementById('label_search').textContent = '搜索';
+      }
+      if (document.getElementById('label_display_nickname')) {
+        document.getElementById('label_display_nickname').textContent = '显示昵称';
+      }
+      if (document.getElementById('label_title_filter')) {
+        document.getElementById('label_title_filter').textContent = i18n.t('label_title_filter');
+      }
+      if (document.getElementById('label_show_circles')) {
+        document.getElementById('label_show_circles').textContent = i18n.t('label_show_circles');
+      }
+      if (document.getElementById('label_show_selected_circles')) {
+        document.getElementById('label_show_selected_circles').textContent = i18n.t('label_show_selected_circles');
+      }
+      if (document.getElementById('label_show_circle_outline')) {
+        document.getElementById('label_show_circle_outline').textContent = i18n.t('label_show_circle_outline');
+      }
+      if (document.getElementById('label_show_ownership')) {
+        document.getElementById('label_show_ownership').textContent = '显示主仆';
+      }
+      if (document.getElementById('label_show_lovership')) {
+        document.getElementById('label_show_lovership').textContent = '显示恋爱';
+      }
+      if (document.getElementById('label_hide_isolated')) {
+        document.getElementById('label_hide_isolated').textContent = '隐藏孤立';
+      }
+      if (document.getElementById('label_neighbor_depth')) {
+        document.getElementById('label_neighbor_depth').textContent = '邻接深度';
+      }
+      if (document.getElementById('label_statistics')) {
+        document.getElementById('label_statistics').textContent = '统计';
+      }
+      if (document.getElementById('stat_members')) {
+        document.getElementById('stat_members').textContent = i18n.t('stat_members_total');
+      }
+      if (document.getElementById('stat_ownership')) {
+        document.getElementById('stat_ownership').textContent = i18n.t('stat_ownership_count');
+      }
+      if (document.getElementById('stat_lovership')) {
+        document.getElementById('stat_lovership').textContent = i18n.t('stat_lovership_count');
+      }
+      if (document.getElementById('label_filter_members')) {
+        document.getElementById('label_filter_members').textContent = i18n.t('label_filter_members');
+      }
+      if (document.getElementById('label_fixed_members')) {
+        document.getElementById('label_fixed_members').textContent = i18n.t('label_fixed_members');
+      }
+      if (document.getElementById('hint_usage')) {
+        document.getElementById('hint_usage').textContent = i18n.t('hint_usage');
+      }
+      
+      // 右侧面板标签
+      if (document.getElementById('label_ownership')) {
+        document.getElementById('label_ownership').textContent = '主仆';
+      }
+      if (document.getElementById('label_lovership')) {
+        document.getElementById('label_lovership').textContent = '恋爱';
+      }
+      if (document.getElementById('label_same_person_group')) {
+        document.getElementById('label_same_person_group').textContent = i18n.t('label_same_person_group');
+      }
+      if (document.getElementById('label_social_circle')) {
+        document.getElementById('label_social_circle').textContent = '社交圈';
+      }
+      if (document.getElementById('label_description')) {
+        document.getElementById('label_description').textContent = '描述';
+      }
+    }
+    
+    function updatePhysicsButtonText() {
+      const btn = document.getElementById('physicsToggleBtn');
+      if (btn) {
+        btn.textContent = manualPhysicsEnabled ? '停止物理' : '开始物理';
+      }
+    }
+    
+    // 初始化UI
+    updateAllUI();
+
+    // ============================================================================
+    // Main Script
+    // ============================================================================
+    
     const fileInput = document.getElementById("fileInput");
     const fileStatus = document.getElementById("file-status");
     const graphContainer = document.getElementById("graph");

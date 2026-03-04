@@ -21,6 +21,343 @@
   'use strict';
 
   // ============================================================================
+  // i18n MODULE (INTERNATIONALIZATION)
+  // ============================================================================
+
+  const i18n = (() => {
+    let currentLanguage = 'zh_CN';
+    let translations = {};
+    let fallbackLanguage = 'en_US';
+
+    function registerLanguage(lang, messages) {
+      translations[lang] = messages;
+    }
+
+    function setLanguage(lang) {
+      if (translations[lang]) {
+        currentLanguage = lang;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('bc-biovis-lang', lang);
+        }
+      } else {
+        console.warn(`[i18n] Language "${lang}" not registered. Available: ${Object.keys(translations).join(', ')}`);
+      }
+    }
+
+    function getLanguage() {
+      return currentLanguage;
+    }
+
+    function translate(key, params = {}, lang = currentLanguage) {
+      let message = translations[lang]?.[key];
+      
+      if (!message && lang !== fallbackLanguage) {
+        message = translations[fallbackLanguage]?.[key];
+      }
+
+      if (!message) {
+        console.warn(`[i18n] Missing translation for key: "${key}" in language "${lang}"`);
+        return key;
+      }
+
+      if (Object.keys(params).length > 0) {
+        return message.replace(/\{(\w+)\}/g, (match, paramKey) => {
+          return params[paramKey] !== undefined ? params[paramKey] : match;
+        });
+      }
+
+      return message;
+    }
+
+    function getAvailableLanguages() {
+      return Object.keys(translations);
+    }
+
+    function init() {
+      if (typeof localStorage !== 'undefined') {
+        const savedLang = localStorage.getItem('bc-biovis-lang');
+        if (savedLang && translations[savedLang]) {
+          currentLanguage = savedLang;
+          return;
+        }
+      }
+
+      const browserLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+      if (browserLang.startsWith('zh')) {
+        currentLanguage = 'zh_CN';
+      } else if (browserLang.startsWith('en')) {
+        currentLanguage = 'en_US';
+      }
+    }
+
+    return {
+      t: translate,
+      setLanguage,
+      getLanguage,
+      registerLanguage,
+      getAvailableLanguages,
+      init
+    };
+  })();
+
+  // ============================================================================
+  // TRANSLATION RESOURCES (LOCALES)
+  // ============================================================================
+
+  const messages_zh_CN = {
+    'main_title': 'BC 资料图查看器',
+    'status_file_not_loaded': '未加载数据',
+    'status_file_loaded': '已加载 {count} 个成员',
+    'status_loading': '加载中...',
+    'button_extract': '提取数据',
+    'button_export_marks': '导出分组',
+    'button_import_marks': '导入分组',
+    'button_export_profiles': '导出档案',
+    'button_import_profiles': '导入档案',
+    'button_physics_start': '开始物理',
+    'button_physics_stop': '停止物理',
+    'button_fit': '适配',
+    'button_close': '关闭',
+    'label_search': '搜索',
+    'placeholder_search': '姓名 / 昵称 / ID',
+    'label_search_on_enter': '回车搜索（减少卡顿）',
+    'text_search_waiting_submit': '输入关键词后按 Enter 执行搜索',
+    'label_display_nickname': '显示昵称',
+    'label_title_filter': '头衔筛选',
+    'label_show_circles': '显示圈子',
+    'label_show_selected_circles': '显示选中圈子',
+    'label_show_circle_outline': '显示圈子轮廓',
+    'label_show_ownership': '显示主仆',
+    'label_show_lovership': '显示恋爱',
+    'label_hide_isolated': '隐藏孤立',
+    'label_neighbor_depth': '邻接深度',
+    'label_statistics': '统计',
+    'stat_members_total': '成员总数',
+    'stat_ownership_count': '主仆关系数',
+    'stat_lovership_count': '恋爱关系数',
+    'label_filter_members': '筛选成员',
+    'label_fixed_members': '固定成员',
+    'button_pin_room': '固定房间',
+    'button_clear_pinned': '清除固定',
+    'no_fixed_members': '无固定节点',
+    'hint_usage': '使用提示：',
+    'hint_line1': '• 双击节点固定可见性',
+    'hint_line2': '• 空格键切换物理引擎',
+    'hint_line3': '• Ctrl+Shift+V 显示/隐藏',
+    'hint_line4': '• 点击筛选成员跳转到节点',
+    'label_same_person_group': '同一人分组',
+    'label_social_circles': '社交圈',
+    'label_description': '描述',
+    'button_clear': '清除',
+    'placeholder_filter_group': '筛选分组',
+    'placeholder_filter_circle': '筛选圈子',
+    'text_select_node': '选择节点查看详情。',
+    'no_groups': '没有分组',
+    'no_circles': '没有圈子',
+    'text_no_selected_group': '未选择分组',
+    'text_circle_section': '圈子部分',
+    'text_drag_resize': '拖动调整大小',
+    'text_filter_panel': '筛选面板',
+    'text_fit_view': '适配视图',
+    'text_extract_data': '提取数据',
+    'text_detail_panel': '详情面板',
+    'text_usage_tip': '使用提示',
+    'toast_extracting': '提取数据中',
+    'toast_export_success': '已导出',
+    'toast_import_failed': '导入分组数据失败',
+    'error_unknown': '未知',
+    'text_fixed_room': '固定房间',
+    'text_owner_label': '主仆',
+    'text_love_label': '恋爱',
+    'dialog_language_select': '选择语言',
+    'lang_chinese': '中文',
+    'lang_english': 'English',
+    'button_save': '保存',
+    'button_create_new': '创建新分组',
+    'error_visnetwork_not_loaded': 'vis-network 库未加载，无法显示图形。请刷新页面重试。',
+    'error_extract_data': '数据提取失败: {error}',
+    'toast_export_marks_success': '导出成功！{groupCount}个分组、{circleCount}个社交圈',
+    'error_export_marks': '导出失败: {error}',
+    'toast_import_marks_success': '导入成功！{groupCount}个分组、{circleCount}个社交圈已合并',
+    'error_import_marks': '导入失败: {error}',
+    'info_reading_profiles': '正在读取档案数据...',
+    'error_no_profiles': '没有档案数据可导出',
+    'toast_export_profiles_success': '导出成功！共 {count} 条档案记录',
+    'error_export_profiles': '档案导出失败: {error}',
+    'info_reading_file': '正在读取文件...',
+    'error_invalid_profile_format': '无效的档案数据格式',
+    'error_no_valid_profiles': '文件中没有有效的档案记录',
+    'info_merging_profiles': '正在合并 {count} 条档案记录...',
+    'toast_import_profiles_success': '导入成功！共合并 {added} 条档案记录（{updated} 条已更新，{skipped} 条已跳过）',
+    'error_import_profiles': '档案导入失败: {error}',
+    'error_no_room_data': '未检测到聊天室成员数据 (ChatRoomCharacter)，请确保您在聊天室中',
+    'error_no_room_members': '当前房间没有成员',
+    'toast_pin_room_success': '已固定 {added} 个房间成员 (共 {total} 人在房间)',
+    'info_no_pinned_members': '没有固定成员需要清除',
+    'toast_clear_pinned_success': '已清除 {count} 个固定成员',
+    'toast_delete_group_success': '分组 "{groupName}" 已删除',
+    'text_select_circle': '请选择一个圈子',
+    'text_no_members': '没有成员',
+    'text_no_data': '无数据',
+    'text_no_description': '无描述',
+    'text_no_node_selected': '未选择节点',
+    'text_no_circle_selected': '未选择圈子',
+    'button_edit': '编辑',
+    'button_delete': '删除',
+    'text_inherited': '（继承）',
+    'confirm_delete_group': '删除分组 "{groupName}"？\n这将取消所有节点的该分组分配。',
+    'confirm_delete_circle': '删除圈子 "{circleName}"？',
+    'text_drag_handle': '拖动移动',
+    'button_cancel': '取消',
+    'placeholder_circle_name': '圈子名称',
+    'placeholder_group_name': '分组名称',
+    'button_create': '创建',
+    'button_create_circle': '新建圈子',
+    'button_create_group': '新建分组',
+    'toast_import_profiles_summary': '导入完成！新增 {added}，更新 {updated}，跳过 {skipped} 条记录',
+    'title_export_profiles': '导出IndexedDB中的全部profiles原始数据',
+    'title_import_profiles': '导入profiles数据并与现有数据合并（保留更新的记录）',
+    'title_toggle_physics': '切换物理（空格）',
+    'title_pin_room': '将当前房间所有成员添加到固定列表',
+    'title_clear_pinned': '清除所有固定成员',
+    'title_total_direct': '总计/直接',
+    'option_all': '全部',
+    'text_no_title': '无',
+    'text_initializing': '初始化中...',
+    'log_startup': 'v2.0.0 启动中...',
+    'log_startup_complete': '初始化完成！输入 /biovis 或按 Ctrl+Shift+V 打开',
+  };
+
+  const messages_en_US = {
+    'main_title': 'BC Profile Graph Viewer',
+    'status_file_not_loaded': 'File not loaded',
+    'status_file_loaded': 'Loaded {count} members',
+    'status_loading': 'Loading...',
+    'button_extract': 'Extract Data',
+    'button_export_marks': 'Export Groups',
+    'button_import_marks': 'Import Groups',
+    'button_export_profiles': 'Export Profiles',
+    'button_import_profiles': 'Import Profiles',
+    'button_physics_start': 'Start Physics',
+    'button_physics_stop': 'Stop Physics',
+    'button_fit': 'Fit',
+    'button_close': 'Close',
+    'label_search': 'Search',
+    'placeholder_search': 'Name / Nickname / ID',
+    'label_search_on_enter': 'Search on Enter (reduce lag)',
+    'text_search_waiting_submit': 'Type a keyword and press Enter to search',
+    'label_display_nickname': 'Show Nickname',
+    'label_title_filter': 'Title Filter',
+    'label_show_circles': 'Show Circles',
+    'label_show_selected_circles': 'Show Selected Circles',
+    'label_show_circle_outline': 'Show Circle Outline',
+    'label_show_ownership': 'Show Ownership',
+    'label_show_lovership': 'Show Love Relationship',
+    'label_hide_isolated': 'Hide Isolated',
+    'label_neighbor_depth': 'Neighbor Depth',
+    'label_statistics': 'Statistics',
+    'stat_members_total': 'Total Members',
+    'stat_ownership_count': 'Ownership Relationships',
+    'stat_lovership_count': 'Love Relationships',
+    'label_filter_members': 'Filter Members',
+    'label_fixed_members': 'Fixed Members',
+    'button_pin_room': 'Pin Room',
+    'button_clear_pinned': 'Clear Pinned',
+    'no_fixed_members': 'No Fixed Nodes',
+    'hint_usage': 'Usage Tips:',
+    'hint_line1': '• Double-click node to pin visibility',
+    'hint_line2': '• Press Space to toggle physics',
+    'hint_line3': '• Ctrl+Shift+V to show/hide',
+    'hint_line4': '• Click filtered members to jump to node',
+    'label_same_person_group': 'Same Person Group',
+    'label_social_circles': 'Social Circles',
+    'label_description': 'Description',
+    'button_clear': 'Clear',
+    'placeholder_filter_group': 'Filter Group',
+    'placeholder_filter_circle': 'Filter Circle',
+    'text_select_node': 'Click a node to view details.',
+    'no_groups': 'No Groups',
+    'no_circles': 'No Circles',
+    'text_no_selected_group': 'No Group Selected',
+    'text_circle_section': 'Circle Section',
+    'text_drag_resize': 'Drag to Resize',
+    'text_filter_panel': 'Filter Panel',
+    'text_fit_view': 'Fit View',
+    'text_extract_data': 'Extract Data',
+    'text_detail_panel': 'Detail Panel',
+    'text_usage_tip': 'Usage Tips',
+    'toast_extracting': 'Extracting data...',
+    'toast_export_success': 'Exported',
+    'toast_import_failed': 'Failed to import groups',
+    'error_unknown': 'Unknown',
+    'text_fixed_room': 'Fixed Room',
+    'text_owner_label': 'Ownership',
+    'text_love_label': 'Love',
+    'dialog_language_select': 'Select Language',
+    'lang_chinese': '中文',
+    'lang_english': 'English',
+    'button_save': 'Save',
+    'button_create_new': 'Create New Group',
+    'error_visnetwork_not_loaded': 'Failed to load vis-network library. Please refresh the page to try again.',
+    'error_extract_data': 'Failed to extract data: {error}',
+    'toast_export_marks_success': 'Exported successfully! {groupCount} groups, {circleCount} social circles',
+    'error_export_marks': 'Export failed: {error}',
+    'toast_import_marks_success': 'Imported successfully! {groupCount} groups, {circleCount} social circles merged',
+    'error_import_marks': 'Import failed: {error}',
+    'info_reading_profiles': 'Reading profile data...',
+    'error_no_profiles': 'No profile data to export',
+    'toast_export_profiles_success': 'Exported successfully! {count} profile records',
+    'error_export_profiles': 'Profile export failed: {error}',
+    'info_reading_file': 'Reading file...',
+    'error_invalid_profile_format': 'Invalid profile data format',
+    'error_no_valid_profiles': 'No valid profile records found in file',
+    'info_merging_profiles': 'Merging {count} profile records...',
+    'toast_import_profiles_success': 'Imported successfully! {added} profile records merged ({updated} updated, {skipped} skipped)',
+    'error_import_profiles': 'Profile import failed: {error}',
+    'error_no_room_data': 'No chat room member data detected. Make sure you are in a chat room.',
+    'error_no_room_members': 'No members in the current room',
+    'toast_pin_room_success': 'Pinned {added} room members ({total} members in room)',
+    'info_no_pinned_members': 'No pinned members to clear',
+    'toast_clear_pinned_success': 'Cleared {count} pinned members',
+    'title_export_profiles': 'Export all raw profile data from IndexedDB',
+    'title_import_profiles': 'Import profile data and merge with existing records (keep newer records)',
+    'title_toggle_physics': 'Toggle Physics (Space)',
+    'title_pin_room': 'Add all current room members to fixed list',
+    'title_clear_pinned': 'Clear all fixed members',
+    'title_total_direct': 'Total/Direct',
+    'option_all': 'All',
+    'text_no_title': 'None',
+    'text_initializing': 'Initializing...',
+    'log_startup': 'v2.0.0 Starting...',
+    'log_startup_complete': 'Initialization complete! Enter /biovis or press Ctrl+Shift+V to open',
+    'toast_delete_group_success': 'Group "{groupName}" deleted',
+    'text_select_circle': 'Please select a social circle',
+    'text_no_members': 'No members',
+    'text_no_data': 'No data',
+    'text_no_description': 'No description',
+    'text_no_node_selected': 'No node selected',
+    'text_no_circle_selected': 'No circle selected',
+    'button_edit': 'Edit',
+    'button_delete': 'Delete',
+    'text_inherited': '(Inherited)',
+    'confirm_delete_group': 'Delete group "{groupName}"?\nThis will unassign all nodes from this group.',
+    'confirm_delete_circle': 'Delete circle "{circleName}"?',
+    'text_drag_handle': 'Drag to move',
+    'button_cancel': 'Cancel',
+    'placeholder_circle_name': 'Circle name',
+    'placeholder_group_name': 'Group name',
+    'button_create': 'Create',
+    'button_create_circle': 'Create Circle',
+    'button_create_group': 'Create Group',
+    'toast_import_profiles_summary': 'Import completed! {added} added, {updated} updated, {skipped} skipped',
+    'text_initializing': 'Initializing...',
+  };
+
+  // Register translations
+  i18n.registerLanguage('zh_CN', messages_zh_CN);
+  i18n.registerLanguage('en_US', messages_en_US);
+
+  // ============================================================================
   // COMPATIBILITY CHECK
   // ============================================================================
 
@@ -314,7 +651,8 @@
       seen: row.seen ?? null,
       title: bundle?.Title ?? null,
       nickname: bundle?.Nickname ?? null,
-      assetFamily: bundle?.AssetFamily ?? null
+      assetFamily: bundle?.AssetFamily ?? null,
+      labelColor: bundle?.LabelColor ?? null
     };
   }
 
@@ -568,7 +906,7 @@
     }
     
     if (!networkInitialized) {
-      showLoadingOverlay('初始化中...');
+      showLoadingOverlay(i18n.t('text_initializing'));
       await initializeVisualizerUI();
       hideLoadingOverlay();
     }
@@ -599,7 +937,9 @@
 
   let loadingOverlay = null;
 
-  function showLoadingOverlay(message = '加载中...') {
+  function showLoadingOverlay(message) {
+    if (!message) message = i18n.t('status_loading');
+    
     if (loadingOverlay) {
       const msgEl = loadingOverlay.querySelector('.loading-message');
       if (msgEl) msgEl.textContent = message;
@@ -1694,139 +2034,147 @@
     container.className = 'visualizer-container';
     container.innerHTML = `
       <header>
-        <h1>BC 资料图查看器</h1>
-        <span class="pill" id="file-status">未加载数据</span>
+        <h1>${i18n.t('main_title')}</h1>
+        <span class="pill" id="file-status">${i18n.t('status_file_not_loaded')}</span>
         <div class="toolbar">
-          <button class="button button-accent" id="extractBtn">提取数据</button>
-          <button class="button" id="exportMarksBtn">导出分组</button>
-          <button class="button" id="importMarksBtn">导入分组</button>
-          <button class="button" id="exportProfilesBtn" title="导出IndexedDB中的全部profiles原始数据">导出档案</button>
-          <button class="button" id="importProfilesBtn" title="导入profiles数据并与现有数据合并（保留更新的记录）">导入档案</button>
-          <button class="button button-accent" id="physicsToggleBtn" title="切换物理（空格）">开始物理</button>
-          <button class="button" id="fitBtn">适配</button>
-          <button class="button button-close" id="closeBtn">关闭</button>
+          <button class="button button-accent" id="extractBtn">${i18n.t('button_extract')}</button>
+          <button class="button" id="exportMarksBtn">${i18n.t('button_export_marks')}</button>
+          <button class="button" id="importMarksBtn">${i18n.t('button_import_marks')}</button>
+          <button class="button" id="exportProfilesBtn" title="${i18n.t('title_export_profiles')}">${i18n.t('button_export_profiles')}</button>
+          <button class="button" id="importProfilesBtn" title="${i18n.t('title_import_profiles')}">${i18n.t('button_import_profiles')}</button>
+          <button class="button button-accent" id="physicsToggleBtn" title="${i18n.t('title_toggle_physics')}">${i18n.t('button_physics_start')}</button>
+          <button class="button" id="fitBtn">${i18n.t('button_fit')}</button>
+          <select id="languageSelect" class="button" style="background:var(--panel-2);border:1px solid var(--line);cursor:pointer;margin-left:auto;">
+            <option value="zh_CN">${i18n.t('lang_chinese')}</option>
+            <option value="en_US">${i18n.t('lang_english')}</option>
+          </select>
+          <button class="button button-close" id="closeBtn">${i18n.t('button_close')}</button>
         </div>
       </header>
       <main>
         <section class="panel" id="left-panel">
           <div class="field">
-            <label for="search">搜索</label>
-            <input type="text" id="search" placeholder="姓名 / 昵称 / ID" />
+            <label for="search">${i18n.t('label_search')}</label>
+            <input type="text" id="search" placeholder="${i18n.t('placeholder_search')}" />
+            <div class="checkbox-row" style="margin-top:6px;">
+              <input type="checkbox" id="searchOnEnter" checked />
+              <label for="searchOnEnter">${i18n.t('label_search_on_enter')}</label>
+            </div>
           </div>
 
           <div class="field">
             <div class="checkbox-row">
               <input type="checkbox" id="displayNickname" />
-              <label for="displayNickname">显示昵称</label>
+              <label for="displayNickname">${i18n.t('label_display_nickname')}</label>
             </div>
           </div>
 
           <div class="field">
-            <label for="titleFilter">头衔筛选</label>
+            <label for="titleFilter">${i18n.t('label_title_filter')}</label>
             <select id="titleFilter">
-              <option value="">全部</option>
+              <option value="">${i18n.t('option_all')}</option>
             </select>
           </div>
 
           <div class="field">
-            <label>显示圈子</label>
+            <label>${i18n.t('label_show_circles')}</label>
             <div class="checkbox-row">
               <input type="checkbox" id="circleFilterEnabled" />
-              <label for="circleFilterEnabled">显示选中圈子</label>
+              <label for="circleFilterEnabled">${i18n.t('label_show_selected_circles')}</label>
             </div>
             <div class="checkbox-row">
               <input type="checkbox" id="showCircleOverlay" checked />
-              <label for="showCircleOverlay">显示圈子轮廓</label>
+              <label for="showCircleOverlay">${i18n.t('label_show_circle_outline')}</label>
             </div>
             <div id="circleFilterList" class="muted" style="font-size:12px;">
-              没有圈子
+              ${i18n.t('no_circles')}
             </div>
           </div>
 
           <div class="field">
             <div class="checkbox-row">
               <input type="checkbox" id="showOwnership" checked />
-              <label for="showOwnership">显示主仆</label>
+              <label for="showOwnership">${i18n.t('label_show_ownership')}</label>
             </div>
             <div class="checkbox-row">
               <input type="checkbox" id="showLovership" checked />
-              <label for="showLovership">显示恋爱</label>
+              <label for="showLovership">${i18n.t('label_show_lovership')}</label>
             </div>
             <div class="checkbox-row">
               <input type="checkbox" id="hideIsolated" />
-              <label for="hideIsolated">隐藏孤立</label>
+              <label for="hideIsolated">${i18n.t('label_hide_isolated')}</label>
             </div>
           </div>
 
           <div class="field">
-            <label for="neighborDepth">邻接深度</label>
+            <label for="neighborDepth">${i18n.t('label_neighbor_depth')}</label>
             <input type="number" id="neighborDepth" min="0" max="1000" value="1" />
           </div>
 
           <div class="field">
-            <label>统计</label>
-            <div class="stat"><span>成员总数</span><span id="statMembers">0</span></div>
-            <div class="stat"><span>主仆关系数</span><span id="statOwnership">0</span></div>
-            <div class="stat"><span>恋爱关系数</span><span id="statLovership">0</span></div>
+            <label>${i18n.t('label_statistics')}</label>
+            <div class="stat"><span>${i18n.t('stat_members_total')}</span><span id="statMembers">0</span></div>
+            <div class="stat"><span>${i18n.t('stat_ownership_count')}</span><span id="statOwnership">0</span></div>
+            <div class="stat"><span>${i18n.t('stat_lovership_count')}</span><span id="statLovership">0</span></div>
           </div>
 
           <div class="field">
-            <label>筛选成员</label>
+            <label>${i18n.t('label_filter_members')}</label>
             <div id="filteredList" class="muted" style="font-size:12px;"></div>
           </div>
 
           <div class="field">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-              <label style="margin:0;">固定成员</label>
+              <label style="margin:0;">${i18n.t('label_fixed_members')}</label>
               <div style="display:flex; gap:4px;">
-                <button class="button" id="pinRoomBtn" style="font-size:11px; padding:2px 6px;" title="将当前房间所有成员添加到固定列表">固定房间</button>
-                <button class="button" id="clearPinnedBtn" style="font-size:11px; padding:2px 6px;" title="清除所有固定成员">清除固定</button>
+                <button class="button" id="pinRoomBtn" style="font-size:11px; padding:2px 6px;" title="${i18n.t('title_pin_room')}">${i18n.t('button_pin_room')}</button>
+                <button class="button" id="clearPinnedBtn" style="font-size:11px; padding:2px 6px;" title="${i18n.t('title_clear_pinned')}">${i18n.t('button_clear_pinned')}</button>
               </div>
             </div>
-            <div id="fixedList" class="muted" style="font-size:12px;">无固定节点</div>
+            <div id="fixedList" class="muted" style="font-size:12px;">${i18n.t('no_fixed_members')}</div>
           </div>
 
           <div class="muted" style="font-size:12px; margin-top: 12px;">
-            <strong>使用提示：</strong><br/>
-            • 双击节点固定可见性<br/>
-            • 空格键切换物理引擎<br/>
-            • Ctrl+Shift+V 显示/隐藏<br/>
-            • 点击筛选成员跳转到节点
+            <strong>${i18n.t('hint_usage')}</strong><br/>
+            ${i18n.t('hint_line1')}<br/>
+            ${i18n.t('hint_line2')}<br/>
+            ${i18n.t('hint_line3')}<br/>
+            ${i18n.t('hint_line4')}
           </div>
         </section>
 
-        <div class="splitter" id="splitter-left" title="拖动调整大小"></div>
+        <div class="splitter" id="splitter-left" title="${i18n.t('text_drag_resize')}"></div>
 
         <section id="graph"></section>
 
-        <div class="splitter" id="splitter-right" title="拖动调整大小"></div>
+        <div class="splitter" id="splitter-right" title="${i18n.t('text_drag_resize')}"></div>
 
         <section class="panel" id="detail-panel">
-          <div id="detail-empty" class="muted">选择节点查看详情。</div>
+          <div id="detail-empty" class="muted">${i18n.t('text_select_node')}</div>
           <div id="detail" style="display:none;">
             <h2 class="detail-title" id="detailName"></h2>
             <div class="detail-sub" id="detailMeta"></div>
             <div class="field">
-              <label>主仆</label>
+              <label>${i18n.t('text_owner_label')}</label>
               <div id="detailOwnership" class="muted"></div>
             </div>
             <div class="field">
-              <label>恋爱</label>
+              <label>${i18n.t('text_love_label')}</label>
               <div id="detailLovership" class="muted"></div>
             </div>
             <div class="field" id="groupSection">
               <div class="field-header">
                 <button class="collapse-toggle" id="groupToggleBtn" type="button">
                   <span class="chevron" aria-hidden="true">v</span>
-                  <span>同一人分组</span>
+                  <span>${i18n.t('label_same_person_group')}</span>
                 </button>
-                <button class="button" id="groupClearBtn" type="button">清除</button>
+                <button class="button" id="groupClearBtn" type="button">${i18n.t('button_clear')}</button>
               </div>
               <div class="field-body" id="groupSectionBody">
                 <div class="group-select-wrap">
-                  <input type="text" id="groupSearch" class="group-select-search" placeholder="筛选分组" />
+                  <input type="text" id="groupSearch" class="group-select-search" placeholder="${i18n.t('placeholder_filter_group')}" />
                   <div id="groupSelectList" class="group-select-list muted" style="font-size:12px;">
-                    没有分组
+                    ${i18n.t('no_groups')}
                   </div>
                 </div>
                 <div class="group-members" id="groupMemberList"></div>
@@ -1837,14 +2185,14 @@
               <div class="field-header">
                 <button class="collapse-toggle" id="circleToggleBtn" type="button">
                   <span class="chevron" aria-hidden="true">v</span>
-                  <span>社交圈</span>
+                  <span>${i18n.t('label_social_circles')}</span>
                 </button>
               </div>
               <div class="field-body" id="circleSectionBody">
                 <div class="circle-select-wrap">
-                  <input type="text" id="circleSearch" class="circle-select-search" placeholder="筛选圈子" />
+                  <input type="text" id="circleSearch" class="circle-select-search" placeholder="${i18n.t('placeholder_filter_circle')}" />
                   <div id="circleSelectList" class="circle-select-list muted" style="font-size:12px;">
-                    没有圈子
+                    ${i18n.t('no_circles')}
                   </div>
                 </div>
                 <div class="group-members" id="circleMemberList"></div>
@@ -1852,7 +2200,7 @@
             </div>
 
             <div class="field detail-description">
-              <label>描述</label>
+              <label>${i18n.t('label_description')}</label>
               <pre id="detailDesc"></pre>
             </div>
 
@@ -1861,11 +2209,11 @@
       </main>
 
       <div class="mobile-nav" id="mobileNav">
-        <button class="mobile-nav-btn" id="mobileLeftBtn" title="筛选面板">☰</button>
-        <button class="mobile-nav-btn" id="mobileFitBtn" title="适配视图">⊞</button>
-        <button class="mobile-nav-btn" id="mobileExtractBtn" title="提取数据">⟳</button>
-        <button class="mobile-nav-btn" id="mobileRightBtn" title="详情面板">☷</button>
-        <button class="mobile-nav-btn" id="mobileCloseBtn" title="关闭" style="color:#ff6b6b;">✕</button>
+        <button class="mobile-nav-btn" id="mobileLeftBtn" title="${i18n.t('text_filter_panel')}">☰</button>
+        <button class="mobile-nav-btn" id="mobileFitBtn" title="${i18n.t('text_fit_view')}">⊞</button>
+        <button class="mobile-nav-btn" id="mobileExtractBtn" title="${i18n.t('text_extract_data')}">⟳</button>
+        <button class="mobile-nav-btn" id="mobileRightBtn" title="${i18n.t('text_detail_panel')}">☷</button>
+        <button class="mobile-nav-btn" id="mobileCloseBtn" title="${i18n.t('button_close')}" style="color:#ff6b6b;">✕</button>
       </div>
 
       <div class="panel-backdrop" id="panelBackdrop"></div>
@@ -2057,6 +2405,7 @@
     const exportProfilesBtn = shadowRoot.getElementById('exportProfilesBtn');
     const importProfilesBtn = shadowRoot.getElementById('importProfilesBtn');
     const searchInput = shadowRoot.getElementById('search');
+    const searchOnEnter = shadowRoot.getElementById('searchOnEnter');
     const displayNickname = shadowRoot.getElementById('displayNickname');
     const titleFilter = shadowRoot.getElementById('titleFilter');
     const showOwnership = shadowRoot.getElementById('showOwnership');
@@ -2068,31 +2417,47 @@
       try {
         // Check if vis-network is available
         if (!isVisNetworkReady()) {
-          showToast('vis-network 库未加载，无法显示图形。请刷新页面重试。', 'error', 5000);
+          showToast(i18n.t('error_visnetwork_not_loaded'), 'error', 5000);
           return;
         }
         
-        showLoadingOverlay('提取数据中...');
+        showLoadingOverlay(i18n.t('toast_extracting'));
         const data = await getData(true, (msg) => {
           updateLoadingMessage(msg);
         });
         
         // Build graph data
         buildData(data);
-        
-        // Initial render
+
+        // Do not render full graph by default. Wait for first non-empty search.
+        hasTriggeredInitialSearch = false;
+        committedSearchQuery = '';
+        selectedNodeId = null;
+        currentGraphSignature = '';
+        lastVisibleNodeCount = 0;
+        hideDetail();
+        if (searchInput) searchInput.value = '';
+
+        if (network) {
+          currentNodeDataSet = new vis.DataSet([]);
+          currentEdgeDataSet = new vis.DataSet([]);
+          network.setData({ nodes: currentNodeDataSet, edges: currentEdgeDataSet });
+          network.redraw();
+        }
+
         usePhysics = true;
-        applyFilters();
+        renderFilteredList([]);
+        renderCircleFilters(null);
         
         hideLoadingOverlay();
-        fileStatus.textContent = `已加载 ${data.length} 条记录`;
+        fileStatus.textContent = i18n.t('status_file_loaded', { count: data.length });
         fileStatus.className = 'pill';
-        console.log('[BC-Bio-Visualizer] Graph rendered successfully');
+        console.log('[BC-Bio-Visualizer] Data prepared. Waiting for first search to render graph.');
       } catch (error) {
         hideLoadingOverlay();
-        fileStatus.textContent = '数据提取失败';
+        fileStatus.textContent = i18n.t('status_file_not_loaded');
         console.error('[BC-Bio-Visualizer] Extraction error:', error);
-        showToast('数据提取失败: ' + error.message, 'error', 5000);
+        showToast(i18n.t('error_extract_data', { error: error.message }), 'error', 5000);
       }
     });
 
@@ -2157,10 +2522,10 @@
         a.click();
         URL.revokeObjectURL(url);
         console.log('[BC-Bio-Visualizer] Marks exported:', payload.statistics);
-        showToast(`导出成功！${groupCount}个分组、${circleCount}个社交圈`, 'success');
+        showToast(i18n.t('toast_export_marks_success', { groupCount, circleCount }), 'success');
       } catch (error) {
         console.error('[BC-Bio-Visualizer] Export error:', error);
-        showToast('导出失败: ' + error.message, 'error');
+        showToast(i18n.t('error_export_marks', { error: error.message }), 'error');
       }
     });
 
@@ -2217,10 +2582,10 @@
           useIncrementalUpdate = false;
           
           console.log('[BC-Bio-Visualizer] Import completed successfully');
-          showToast(`导入成功！${importGroupCount}个分组、${importCircleCount}个社交圈已合并`, 'success', 4000);
+          showToast(i18n.t('toast_import_marks_success', { groupCount: importGroupCount, circleCount: importCircleCount }), 'success', 4000);
         } catch (error) {
           console.error('[BC-Bio-Visualizer] Import error:', error);
-          showToast('导入失败: ' + error.message, 'error');
+          showToast(i18n.t('error_import_marks', { error: error.message }), 'error');
         }
         
         fileInput.remove();
@@ -2233,10 +2598,10 @@
     // Export profiles data
     exportProfilesBtn.addEventListener('click', async () => {
       try {
-        showToast('正在读取档案数据...', 'info', 2000);
+        showToast(i18n.t('info_reading_profiles'), 'info', 2000);
         const raw = await readAllFromStore(CONFIG.DB_NAME, CONFIG.STORE_NAME);
         if (raw.length === 0) {
-          showToast('没有档案数据可导出', 'error');
+          showToast(i18n.t('error_no_profiles'), 'error');
           return;
         }
         const payload = {
@@ -2256,10 +2621,10 @@
         a.click();
         URL.revokeObjectURL(url);
         console.log(`[BC-Bio-Visualizer] Profiles exported: ${raw.length} records`);
-        showToast(`导出成功！共 ${raw.length} 条档案记录`, 'success');
+        showToast(i18n.t('toast_export_profiles_success', { count: raw.length }), 'success');
       } catch (error) {
         console.error('[BC-Bio-Visualizer] Profiles export error:', error);
-        showToast('档案导出失败: ' + error.message, 'error');
+        showToast(i18n.t('error_export_profiles', { error: error.message }), 'error');
       }
     });
 
@@ -2275,7 +2640,7 @@
         if (!file) return;
 
         try {
-          showToast('正在读取文件...', 'info', 2000);
+          showToast(i18n.t('info_reading_file'), 'info', 2000);
           const text = await file.text();
           const parsed = JSON.parse(text);
 
@@ -2287,7 +2652,7 @@
             // Support raw array format
             profiles = parsed;
           } else {
-            showToast('无效的档案数据格式', 'error');
+            showToast(i18n.t('error_invalid_profile_format'), 'error');
             fileInput.remove();
             return;
           }
@@ -2295,13 +2660,13 @@
           // Validate records have memberNumber
           const validProfiles = profiles.filter(p => p.memberNumber !== undefined && p.memberNumber !== null);
           if (validProfiles.length === 0) {
-            showToast('文件中没有有效的档案记录', 'error');
+            showToast(i18n.t('error_no_valid_profiles'), 'error');
             fileInput.remove();
             return;
           }
 
           console.log(`[BC-Bio-Visualizer] Importing ${validProfiles.length} profiles (from ${profiles.length} total)...`);
-          showToast(`正在合并 ${validProfiles.length} 条档案记录...`, 'info', 3000);
+          showToast(i18n.t('info_merging_profiles', { count: validProfiles.length }), 'info', 3000);
 
           const result = await mergeProfilesIntoStore(
             CONFIG.DB_NAME,
@@ -2316,13 +2681,13 @@
 
           console.log('[BC-Bio-Visualizer] Profiles import completed:', result);
           showToast(
-            `导入完成！新增 ${result.added}，更新 ${result.updated}，跳过 ${result.skipped} 条记录`,
+            i18n.t('toast_import_profiles_summary', { added: result.added, updated: result.updated, skipped: result.skipped }),
             'success',
             5000
           );
         } catch (error) {
           console.error('[BC-Bio-Visualizer] Profiles import error:', error);
-          showToast('档案导入失败: ' + error.message, 'error');
+          showToast(i18n.t('error_import_profiles', { error: error.message }), 'error');
         }
 
         fileInput.remove();
@@ -2337,14 +2702,14 @@
     if (pinRoomBtn) {
       pinRoomBtn.addEventListener('click', () => {
         if (typeof ChatRoomCharacter === 'undefined' || !Array.isArray(ChatRoomCharacter)) {
-          showToast('未检测到聊天室成员数据 (ChatRoomCharacter)，请确保您在聊天室中', 'error', 4000);
+          showToast(i18n.t('error_no_room_data'), 'error', 4000);
           return;
         }
         const memberNumbers = ChatRoomCharacter
           .map(i => i.MemberNumber)
           .filter(n => n !== undefined && n !== null);
         if (memberNumbers.length === 0) {
-          showToast('当前房间没有成员', 'error', 3000);
+          showToast(i18n.t('error_no_room_members'), 'error', 3000);
           return;
         }
         let addedCount = 0;
@@ -2360,7 +2725,7 @@
         useIncrementalUpdate = true;
         invalidateGraph();
         useIncrementalUpdate = false;
-        showToast(`已固定 ${addedCount} 个房间成员 (共 ${memberNumbers.length} 人在房间)`, 'success', 3000);
+        showToast(i18n.t('toast_pin_room_success', { added: addedCount, total: memberNumbers.length }), 'success', 3000);
         console.log('[BC-Bio-Visualizer] Pinned room members:', memberNumbers);
       });
     }
@@ -2370,7 +2735,7 @@
     if (clearPinnedBtn) {
       clearPinnedBtn.addEventListener('click', () => {
         if (pinnedNodes.size === 0) {
-          showToast('没有固定成员需要清除', 'info', 2000);
+          showToast(i18n.t('info_no_pinned_members'), 'info', 2000);
           return;
         }
         const count = pinnedNodes.size;
@@ -2380,7 +2745,7 @@
         useIncrementalUpdate = true;
         invalidateGraph();
         useIncrementalUpdate = false;
-        showToast(`已清除 ${count} 个固定成员`, 'success', 3000);
+        showToast(i18n.t('toast_clear_pinned_success', { count }), 'success', 3000);
         console.log('[BC-Bio-Visualizer] Cleared all pinned nodes');
       });
     }
@@ -2388,12 +2753,41 @@
     // Close button
     closeBtn.addEventListener('click', hideVisualizer);
 
-    // Search input with debounce
+    // Search input (default: submit on Enter to avoid input lag)
     if (searchInput) {
+      searchInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        committedSearchQuery = searchInput.value.trim().toLowerCase();
+        if (committedSearchQuery) {
+          hasTriggeredInitialSearch = true;
+        }
+        console.log('[BC-Bio-Visualizer] Search submitted:', committedSearchQuery);
+        applyFilters();
+      });
+
       searchInput.addEventListener('input', debounce(() => {
-        console.log('[BC-Bio-Visualizer] Search:', searchInput.value);
+        if (searchOnEnter && searchOnEnter.checked) return;
+        committedSearchQuery = searchInput.value.trim().toLowerCase();
+        if (committedSearchQuery) {
+          hasTriggeredInitialSearch = true;
+        }
+        console.log('[BC-Bio-Visualizer] Search (realtime):', committedSearchQuery);
         applyFilters();
       }, 300));
+    }
+
+    if (searchOnEnter) {
+      searchOnEnter.addEventListener('change', () => {
+        if (searchOnEnter.checked) {
+          committedSearchQuery = '';
+        } else if (searchInput) {
+          committedSearchQuery = searchInput.value.trim().toLowerCase();
+          if (committedSearchQuery) {
+            hasTriggeredInitialSearch = true;
+          }
+        }
+        applyFilters();
+      });
     }
 
     // Display nickname toggle
@@ -2403,7 +2797,7 @@
         allNodes = allNodes.map(n => {
           const m = membersById.get(n.id);
           if (!m) return n;
-          const name = (displayNickname.checked && m.nickname) ? m.nickname : (m.name || '未知');
+          const name = (displayNickname.checked && m.nickname) ? m.nickname : (m.name || i18n.t('error_unknown'));
           return { ...n, label: `${name} (#${n.id})` };
         });
         currentGraphSignature = ''; // Force re-render
@@ -2566,7 +2960,7 @@
         
         if (action === 'delete') {
           const groupName = markData.groups[groupId].name;
-          if (!confirm(`删除分组 "${groupName}"？\n这将取消所有节点的该分组分配。`)) return;
+          if (!confirm(i18n.t('confirm_delete_group', { groupName }))) return;
           
           // Remove all node assignments
           Object.keys(markData.nodeToGroup).forEach(id => {
@@ -2580,7 +2974,7 @@
           useIncrementalUpdate = true;
           invalidateGraph();
           useIncrementalUpdate = false;
-          showToast(`分组 "${groupName}" 已删除`, 'success');
+          showToast(i18n.t('toast_delete_group_success', { groupName }), 'success');
           return;
         }
 
@@ -2730,7 +3124,7 @@
         }
         
         if (action === 'delete') {
-          if (!confirm(`删除圈子 "${markData.circles[circleId].name}"？`)) return;
+          if (!confirm(i18n.t('confirm_delete_circle', { circleName: markData.circles[circleId].name }))) return;
           
           Object.values(markData.circles).forEach(circle => {
             if (!circle || !Array.isArray(circle.children)) return;
@@ -2761,6 +3155,9 @@
           if (target.tagName !== "INPUT" && target.tagName !== "BUTTON") {
             focusedCircleId = circleId;
             renderCircleSelect(selectedNodeId);
+            useIncrementalUpdate = true;
+            invalidateGraph();
+            useIncrementalUpdate = false;
           }
         }
       });
@@ -2970,6 +3367,212 @@
       if (touch) handleSplitterMove(touch);
     }, { passive: true });
     document.addEventListener("touchend", endSplitterDrag);
+
+    // Language selector
+    const languageSelect = shadowRoot.getElementById('languageSelect');
+    if (languageSelect) {
+      languageSelect.value = i18n.getLanguage();
+      languageSelect.addEventListener('change', () => {
+        i18n.setLanguage(languageSelect.value);
+        console.log('[BC-Bio-Visualizer] Language changed to:', languageSelect.value);
+        // Update UI text dynamically without reloading
+        updateUILanguage();
+      });
+    }
+  }
+
+  /**
+   * Update all UI text elements when language changes
+   */
+  function updateUILanguage() {
+    // Header
+    const title = shadowRoot.querySelector('header h1');
+    if (title) title.textContent = i18n.t('main_title');
+
+    const fileStatus = shadowRoot.getElementById('file-status');
+    if (fileStatus && !rawMembers.length) {
+      fileStatus.textContent = i18n.t('status_file_not_loaded');
+    } else if (fileStatus && rawMembers.length) {
+      fileStatus.textContent = i18n.t('status_file_loaded', { count: rawMembers.length });
+    }
+
+    // Buttons
+    const extractBtn = shadowRoot.getElementById('extractBtn');
+    if (extractBtn) extractBtn.textContent = i18n.t('button_extract');
+
+    const exportMarksBtn = shadowRoot.getElementById('exportMarksBtn');
+    if (exportMarksBtn) exportMarksBtn.textContent = i18n.t('button_export_marks');
+
+    const importMarksBtn = shadowRoot.getElementById('importMarksBtn');
+    if (importMarksBtn) importMarksBtn.textContent = i18n.t('button_import_marks');
+
+    const exportProfilesBtn = shadowRoot.getElementById('exportProfilesBtn');
+    if (exportProfilesBtn) {
+      exportProfilesBtn.textContent = i18n.t('button_export_profiles');
+      exportProfilesBtn.title = i18n.t('title_export_profiles');
+    }
+
+    const importProfilesBtn = shadowRoot.getElementById('importProfilesBtn');
+    if (importProfilesBtn) {
+      importProfilesBtn.textContent = i18n.t('button_import_profiles');
+      importProfilesBtn.title = i18n.t('title_import_profiles');
+    }
+
+    const physicsToggleBtn = shadowRoot.getElementById('physicsToggleBtn');
+    if (physicsToggleBtn) {
+      physicsToggleBtn.textContent = usePhysics ? i18n.t('button_physics_stop') : i18n.t('button_physics_start');
+      physicsToggleBtn.title = i18n.t('title_toggle_physics');
+    }
+
+    const fitBtn = shadowRoot.getElementById('fitBtn');
+    if (fitBtn) fitBtn.textContent = i18n.t('button_fit');
+
+    const closeBtn = shadowRoot.getElementById('closeBtn');
+    if (closeBtn) closeBtn.textContent = i18n.t('button_close');
+
+    // Language selector options
+    const langOptions = shadowRoot.querySelectorAll('#languageSelect option');
+    if (langOptions[0]) langOptions[0].textContent = i18n.t('lang_chinese');
+    if (langOptions[1]) langOptions[1].textContent = i18n.t('lang_english');
+
+    // Left panel labels
+    const searchLabel = shadowRoot.querySelector('label[for="search"]');
+    if (searchLabel) searchLabel.textContent = i18n.t('label_search');
+
+    const searchInput = shadowRoot.getElementById('search');
+    if (searchInput) searchInput.placeholder = i18n.t('placeholder_search');
+
+    const searchOnEnterLabel = shadowRoot.querySelector('label[for="searchOnEnter"]');
+    if (searchOnEnterLabel) searchOnEnterLabel.textContent = i18n.t('label_search_on_enter');
+
+    const displayNicknameLabel = shadowRoot.querySelector('label[for="displayNickname"]');
+    if (displayNicknameLabel) displayNicknameLabel.textContent = i18n.t('label_display_nickname');
+
+    const titleFilterLabel = shadowRoot.querySelector('label[for="titleFilter"]');
+    if (titleFilterLabel) titleFilterLabel.textContent = i18n.t('label_title_filter');
+
+    // Update title filter first option
+    const titleFilter = shadowRoot.getElementById('titleFilter');
+    if (titleFilter && titleFilter.options[0]) {
+      titleFilter.options[0].textContent = i18n.t('option_all');
+    }
+
+    const circleFilterLabels = shadowRoot.querySelectorAll('#left-panel .field')[4]?.querySelectorAll('label');
+    if (circleFilterLabels) {
+      if (circleFilterLabels[0]) circleFilterLabels[0].textContent = i18n.t('label_show_circles');
+      if (circleFilterLabels[1]) circleFilterLabels[1].textContent = i18n.t('label_show_selected_circles');
+      if (circleFilterLabels[2]) circleFilterLabels[2].textContent = i18n.t('label_show_circle_outline');
+    }
+
+    const ownershipLabel = shadowRoot.querySelector('label[for="showOwnership"]');
+    if (ownershipLabel) ownershipLabel.textContent = i18n.t('label_show_ownership');
+
+    const lovershipLabel = shadowRoot.querySelector('label[for="showLovership"]');
+    if (lovershipLabel) lovershipLabel.textContent = i18n.t('label_show_lovership');
+
+    const hideIsolatedLabel = shadowRoot.querySelector('label[for="hideIsolated"]');
+    if (hideIsolatedLabel) hideIsolatedLabel.textContent = i18n.t('label_hide_isolated');
+
+    const neighborDepthLabel = shadowRoot.querySelector('label[for="neighborDepth"]');
+    if (neighborDepthLabel) neighborDepthLabel.textContent = i18n.t('label_neighbor_depth');
+
+    // Statistics labels
+    const statLabels = shadowRoot.querySelectorAll('.stat span:first-child');
+    if (statLabels[0]) statLabels[0].textContent = i18n.t('stat_members_total');
+    if (statLabels[1]) statLabels[1].textContent = i18n.t('stat_ownership_count');
+    if (statLabels[2]) statLabels[2].textContent = i18n.t('stat_lovership_count');
+
+    // Filter members and fixed members section
+    const filterMembersLabel = shadowRoot.querySelectorAll('#left-panel .field')[9]?.querySelector('label');
+    if (filterMembersLabel) filterMembersLabel.textContent = i18n.t('label_filter_members');
+
+    const fixedMembersLabel = shadowRoot.querySelectorAll('#left-panel .field')[10]?.querySelector('label');
+    if (fixedMembersLabel) fixedMembersLabel.textContent = i18n.t('label_fixed_members');
+
+    const pinRoomBtn = shadowRoot.getElementById('pinRoomBtn');
+    if (pinRoomBtn) pinRoomBtn.textContent = i18n.t('button_pin_room');
+
+    const clearPinnedBtn = shadowRoot.getElementById('clearPinnedBtn');
+    if (clearPinnedBtn) clearPinnedBtn.textContent = i18n.t('button_clear_pinned');
+
+    const fixedList = shadowRoot.getElementById('fixedList');
+    if (fixedList && pinnedNodes.size === 0) {
+      fixedList.textContent = i18n.t('no_fixed_members');
+    }
+
+    // Usage hints
+    const hintSection = shadowRoot.querySelector('.muted strong');
+    if (hintSection) {
+      const hintContainer = hintSection.parentElement;
+      if (hintContainer) {
+        hintContainer.innerHTML = `
+          <strong>${i18n.t('hint_usage')}</strong><br/>
+          ${i18n.t('hint_line1')}<br/>
+          ${i18n.t('hint_line2')}<br/>
+          ${i18n.t('hint_line3')}<br/>
+          ${i18n.t('hint_line4')}
+        `;
+      }
+    }
+
+    // Splitters
+    const splitters = shadowRoot.querySelectorAll('.splitter');
+    splitters.forEach(s => s.title = i18n.t('text_drag_resize'));
+
+    // Detail panel
+    const detailEmpty = shadowRoot.getElementById('detail-empty');
+    if (detailEmpty) detailEmpty.textContent = i18n.t('text_select_node');
+
+    const ownerLabel = shadowRoot.querySelector('#detailOwnership')?.previousElementSibling;
+    if (ownerLabel && ownerLabel.tagName === 'LABEL') {
+      ownerLabel.textContent = i18n.t('text_owner_label');
+    }
+
+    const loveLabel = shadowRoot.querySelector('#detailLovership')?.previousElementSibling;
+    if (loveLabel && loveLabel.tagName === 'LABEL') {
+      loveLabel.textContent = i18n.t('text_love_label');
+    }
+
+    const groupToggleBtn = shadowRoot.getElementById('groupToggleBtn');
+    if (groupToggleBtn) {
+      const span = groupToggleBtn.querySelector('span:not(.chevron)');
+      if (span) span.textContent = i18n.t('label_same_person_group');
+    }
+
+    const groupClearBtn = shadowRoot.getElementById('groupClearBtn');
+    if (groupClearBtn) groupClearBtn.textContent = i18n.t('button_clear');
+
+    const groupSearch = shadowRoot.getElementById('groupSearch');
+    if (groupSearch) groupSearch.placeholder = i18n.t('placeholder_filter_group');
+
+    const circleToggleBtn = shadowRoot.getElementById('circleToggleBtn');
+    if (circleToggleBtn) {
+      const span = circleToggleBtn.querySelector('span:not(.chevron)');
+      if (span) span.textContent = i18n.t('label_social_circles');
+    }
+
+    const circleSearch = shadowRoot.getElementById('circleSearch');
+    if (circleSearch) circleSearch.placeholder = i18n.t('placeholder_filter_circle');
+
+    const descLabel = shadowRoot.querySelector('#detailDesc')?.previousElementSibling;
+    if (descLabel && descLabel.tagName === 'LABEL') {
+      descLabel.textContent = i18n.t('label_description');
+    }
+
+    // Re-render dynamic content that uses i18n
+    if (selectedNodeId) {
+      renderGroupSelect(selectedNodeId);
+      renderCircleSelect(selectedNodeId);
+      showDetail(selectedNodeId);
+    }
+
+    // Update circle filter list if visible
+    const circleFilterEnabled = shadowRoot.getElementById('circleFilterEnabled');
+    if (circleFilterEnabled) {
+      renderCircleFilters();
+    }
+
+    console.log('[BC-Bio-Visualizer] UI language updated');
   }
 
   // ============================================================================
@@ -2994,6 +3597,8 @@
   let currentNodeDataSet = null;
   let currentEdgeDataSet = null;
   let lastRenderedSelectedNodeId = null;
+  let committedSearchQuery = "";
+  let hasTriggeredInitialSearch = false;
 
   // Performance: cached indexes and stats
   let _cachedGroupIndex = null;   // { groupToNodes, nodeToGroup }
@@ -3185,15 +3790,17 @@
     const hasSelection = !!selectedId;
     const groupMembers = hasSelection ? new Set(getGroupMembers(selectedId)) : null;
     const multiGroup = groupMembers && groupMembers.size > 1;
-    const hasCircleFilter = (() => {
-      const el = shadowRoot.getElementById('circleFilterEnabled');
-      return el && el.checked && circleFilterSelected.size > 0;
+    const focusedCircleSet = (() => {
+      if (!focusedCircleId || !markData.circles[focusedCircleId]) return null;
+      const { childrenById } = buildCircleForest(markData.circles);
+      const descendants = getCircleDescendants(String(focusedCircleId), childrenById);
+      return new Set([String(focusedCircleId), ...descendants]);
     })();
-    const expandedFilters = hasCircleFilter ? getExpandedCircleFilterSet(circleFilterSelected) : null;
+    const hasFocusedCircle = !!(focusedCircleSet && focusedCircleSet.size > 0);
     const hasPinned = pinnedNodes.size > 0;
 
     // Fast path: nothing to apply
-    if (!Object.keys(markData.nodeToGroup).length && !multiGroup && !hasCircleFilter && !hasPinned) {
+    if (!Object.keys(markData.nodeToGroup).length && !multiGroup && !hasFocusedCircle && !hasPinned) {
       return nodes;
     }
 
@@ -3219,20 +3826,22 @@
       if (multiGroup && groupMembers.has(n.id) && String(n.id) !== String(selectedId)) {
         const baseSize = Number.isFinite(size) ? size : 8;
         const baseBorder = Number.isFinite(borderWidth) ? borderWidth : 1;
-        size = baseSize + 1;
-        borderWidth = baseBorder + 1;
-        shadow = { enabled: true, color: "rgba(43, 106, 122, 0.65)", size: 18, x: 0, y: 0 };
-        color = { border: "#2b6a7a", background: "#15242b" };
+        size = baseSize + 2.5;
+        borderWidth = baseBorder + 3;
+        shadow = { enabled: true, color: "rgba(170, 228, 255, 0.98)", size: 90, x: 0, y: 0 };
+        color = { border: "#8fd8ff", background: "#1e4057" };
         modified = true;
       }
 
-      // 3. Circle filter highlight
-      if (expandedFilters) {
+      // 3. Circle highlight (only focused circle on right panel)
+      if (hasFocusedCircle) {
         const circles = circleMembersByNode.get(n.id);
         if (circles) {
           for (let i = 0; i < circles.length; i++) {
-            if (expandedFilters.has(circles[i])) {
-              shadow = { enabled: true, color: "rgba(89, 165, 255, 0.55)", size: 16, x: 0, y: 0 };
+            if (focusedCircleSet.has(String(circles[i]))) {
+              if (!shadow || (shadow.size || 0) < 20) {
+                shadow = { enabled: true, color: "rgba(166, 212, 255, 0.95)", size: 80, x: 0, y: 0 };
+              }
               modified = true;
               break;
             }
@@ -3357,10 +3966,10 @@
 
   function getMemberLabel(memberId) {
     const m = membersById.get(String(memberId));
-    if (!m) return `未知 (#${memberId})`;
+    if (!m) return `${i18n.t('error_unknown')} (#${memberId})`;
     const displayNickname = shadowRoot.getElementById('displayNickname');
     const nickname = m.nickname || m.lastNick;
-    const name = m.name || '未知';
+    const name = m.name || i18n.t('error_unknown');
     if (displayNickname && displayNickname.checked && nickname) {
       return `${nickname} (#${memberId})`;
     }
@@ -3796,7 +4405,7 @@
       return { id, name: circle.name || id, depth };
     });
     if (!entries.length) {
-      circleFilterList.textContent = "没有圈子";
+      circleFilterList.textContent = i18n.t('no_circles');
       circleFilterSelected = new Set();
       return;
     }
@@ -3824,7 +4433,7 @@
       const direct = directCounts.get(String(c.id)) || 0;
       const checked = circleFilterSelected.has(c.id) ? "checked" : "";
       const branch = c.depth > 0 ? `${"| ".repeat(Math.min(6, c.depth) - 1)}|- ` : "";
-      return `<label class="circle-filter-item"><input type="checkbox" data-id="${c.id}" ${checked} /><span class="tree-branch">${branch}</span><span class="filter-dot"></span>${safeText(c.name)} <span class="muted" title="总计/直接">(${total}/${direct})</span></label>`;
+      return `<label class="circle-filter-item"><input type="checkbox" data-id="${c.id}" ${checked} /><span class="tree-branch">${branch}</span><span class="filter-dot"></span>${safeText(c.name)} <span class="muted" title="${i18n.t('title_total_direct')}">(${total}/${direct})</span></label>`;
     }).join("");
   }
 
@@ -3854,16 +4463,23 @@
     members.forEach(m => {
       const id = String(m.memberNumber);
       const displayName = shadowRoot.getElementById('displayNickname');
-      const name = (displayName && displayName.checked && m.nickname) ? m.nickname : (m.name || '未知');
+      const name = (displayName && displayName.checked && m.nickname) ? m.nickname : (m.name || i18n.t('error_unknown'));
       const label = `${name} (#${id})`;
       
-      nodes.push({
+      const nodeData = {
         id,
         label,
-        group: m.title || "无",
+        group: m.title || i18n.t('text_no_title'),
         title: `${m.title || ''}\n${m.nickname || ''}`.trim(),
         value: 1
-      });
+      };
+      
+      // Set node color from LabelColor if available
+      if (m.labelColor) {
+        nodeData.color = m.labelColor;
+      }
+      
+      nodes.push(nodeData);
 
       // Ownership edges
       if (m.ownership && m.ownership.MemberNumber !== undefined) {
@@ -3903,11 +4519,11 @@
     const nodeIds = new Set(nodes.map(n => n.id));
     edges.forEach(e => {
       if (!nodeIds.has(e.from)) {
-        nodes.push({ id: e.from, label: `未知 (#${e.from})`, group: "未知" });
+        nodes.push({ id: e.from, label: `${i18n.t('error_unknown')} (#${e.from})`, group: i18n.t('error_unknown') });
         nodeIds.add(e.from);
       }
       if (!nodeIds.has(e.to)) {
-        nodes.push({ id: e.to, label: `未知 (#${e.to})`, group: "未知" });
+        nodes.push({ id: e.to, label: `${i18n.t('error_unknown')} (#${e.to})`, group: i18n.t('error_unknown') });
         nodeIds.add(e.to);
       }
     });
@@ -3937,8 +4553,8 @@
     // Update title filter
     const titleFilter = shadowRoot.getElementById('titleFilter');
     if (titleFilter) {
-      const titles = Array.from(new Set(members.map(m => m.title || "无"))).sort();
-      titleFilter.innerHTML = "<option value=\"\">全部</option>" + 
+      const titles = Array.from(new Set(members.map(m => m.title || i18n.t('text_no_title')))).sort();
+      titleFilter.innerHTML = `<option value="">${i18n.t('option_all')}</option>` + 
         titles.map(t => `<option value="${t}">${t}</option>`).join("");
     }
 
@@ -3980,6 +4596,7 @@
     }
 
     const searchInput = shadowRoot.getElementById('search');
+    const searchOnEnter = shadowRoot.getElementById('searchOnEnter');
     const titleFilter = shadowRoot.getElementById('titleFilter');
     const showOwnership = shadowRoot.getElementById('showOwnership');
     const showLovership = shadowRoot.getElementById('showLovership');
@@ -3988,7 +4605,9 @@
     const neighborDepthEl = shadowRoot.getElementById('neighborDepth');
     const circleFilterEnabled = shadowRoot.getElementById('circleFilterEnabled');
 
-    const q = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const q = (searchOnEnter && searchOnEnter.checked)
+      ? committedSearchQuery
+      : (searchInput ? searchInput.value.trim().toLowerCase() : '');
     const title = titleFilter ? titleFilter.value : '';
     const showO = showOwnership ? showOwnership.checked : true;
     const showL = showLovership ? showLovership.checked : true;
@@ -4034,8 +4653,8 @@
       const name = m && m.name ? String(m.name).toLowerCase() : '';
       const nickname = m && m.nickname ? String(m.nickname).toLowerCase() : '';
       const idStr = n.id;
-      const titleMatch = !title || (m && (m.title || "无") === title);
-      const searchMatch = !q || name.includes(q) || nickname.includes(q) || idStr.includes(q);
+      const titleMatch = !title || (m && (m.title || i18n.t('text_no_title')) === title);
+      const searchMatch = !!q && (name.includes(q) || nickname.includes(q) || idStr.includes(q));
 
       if (titleMatch && searchMatch) {
         allowedNodes.add(n.id);
@@ -4203,6 +4822,7 @@
     // Fast signature using simple hash instead of full JSON.stringify
     const sigParts = [];
     sigParts.push(displayNickname && displayNickname.checked ? 'N' : 'n');
+    sigParts.push(q || '');
     sigParts.push(String(displayNodes.length));
     sigParts.push(String(edges.length + groupEdges.length + circleEdges.length));
     // Include circle filter state so toggling filters invalidates the signature
@@ -4315,6 +4935,19 @@
    * Apply filters and render graph (Phase 5 - with double-click pin)
    */
   function applyFilters() {
+    // Allow rendering if:
+    // 1. User has triggered initial search, OR
+    // 2. There are pinned nodes, OR
+    // 3. There are selected circle filters (groups) enabled
+    const circleFilterEnabledCheck = shadowRoot.getElementById('circleFilterEnabled');
+    const hasActiveCircleFilter = circleFilterEnabledCheck && circleFilterEnabledCheck.checked && circleFilterSelected.size > 0;
+    const hasPinnedNodes = pinnedNodes.size > 0;
+    
+    if (!hasTriggeredInitialSearch && !hasPinnedNodes && !hasActiveCircleFilter) {
+      renderFilteredList([]);
+      return;
+    }
+
     const positionMap = !usePhysics && network ? network.getPositions() : null;
     const graph = computeGraph(positionMap);
     if (!graph) return;
@@ -4539,6 +5172,12 @@
     const filteredList = shadowRoot.getElementById('filteredList');
     if (!filteredList) return;
 
+    const searchOnEnter = shadowRoot.getElementById('searchOnEnter');
+    if (searchOnEnter && searchOnEnter.checked && !committedSearchQuery) {
+      filteredList.innerHTML = `<div class="muted" style="font-size:12px;">${i18n.t('text_search_waiting_submit')}</div>`;
+      return;
+    }
+
     if (!nodes || nodes.length === 0) {
       filteredList.innerHTML = '<div class="muted" style="font-size:12px;">没有匹配项</div>';
       return;
@@ -4607,15 +5246,15 @@
     if (!fixedList) return;
 
     if (pinnedNodes.size === 0) {
-      fixedList.innerHTML = '<div class="muted" style="font-size:12px;">无固定节点</div>';
+      fixedList.innerHTML = `<div class="muted" style="font-size:12px;">${i18n.t('no_fixed_members')}</div>`;
       return;
     }
 
     const pinnedArray = Array.from(pinnedNodes).map(id => {
       const m = membersById.get(String(id));
-      if (!m) return `未知 (#${id})`;
+      if (!m) return `${i18n.t('error_unknown')} (#${id})`;
       const displayNickname = shadowRoot.getElementById('displayNickname');
-      const name = (displayNickname && displayNickname.checked && m.nickname) ? m.nickname : (m.name || '未知');
+      const name = (displayNickname && displayNickname.checked && m.nickname) ? m.nickname : (m.name || i18n.t('error_unknown'));
       return `${name} (#${id})`;
     }).sort();
 
@@ -4630,7 +5269,7 @@
     if (!circleMemberList) return;
 
     if (!circleId) {
-      circleMemberList.textContent = "请选择一个圈子";
+      circleMemberList.textContent = i18n.t('text_select_circle');
       return;
     }
 
@@ -4644,7 +5283,7 @@
       .sort((a, b) => a.localeCompare(b));
 
     if (!members.length) {
-      circleMemberList.textContent = "没有成员";
+      circleMemberList.textContent = i18n.t('text_no_members');
       return;
     }
 
@@ -4711,8 +5350,8 @@
               <input type="checkbox" ${checked} ${disabled} />
               <input type="text" class="item-input" value="${safeText(circle.name)}" data-original="${safeText(circle.name)}" style="padding-left:${indent}px;" />
               <div class="item-actions">
-                <button class="icon-btn save" title="保存" data-action="save">✓</button>
-                <button class="icon-btn" title="取消" data-action="cancel">✕</button>
+                <button class="icon-btn save" title="${i18n.t('button_save')}" data-action="save">✓</button>
+                <button class="icon-btn" title="${i18n.t('button_cancel')}" data-action="cancel">✕</button>
               </div>
             </div>
           `;
@@ -4722,14 +5361,14 @@
           <div class="select-item ${impliedClass} ${focusedClass}" data-id="${id}" draggable="true">
             <input type="checkbox" ${checked} ${disabled} />
             <span class="item-label">
-              <span class="drag-handle" title="拖动移动">||</span>
+              <span class="drag-handle" title="${i18n.t('text_drag_handle')}">||</span>
               <span class="tree-branch">${branch}</span>
               <span class="tree-node-dot"></span>
-              ${safeText(circle.name || id)}${isImplied ? ' <span class="muted" style="margin-left:6px;font-size:11px;">（继承）</span>' : ''}
+              ${safeText(circle.name || id)}${isImplied ? ` <span class="muted" style="margin-left:6px;font-size:11px;">${i18n.t('text_inherited')}</span>` : ''}
             </span>
             <div class="item-actions">
-              <button class="icon-btn" title="编辑" data-action="edit">✏️</button>
-              <button class="icon-btn delete" title="删除" data-action="delete">🗑️</button>
+              <button class="icon-btn" title="${i18n.t('button_edit')}" data-action="edit">✏️</button>
+              <button class="icon-btn delete" title="${i18n.t('button_delete')}" data-action="delete">🗑️</button>
             </div>
           </div>
         `;
@@ -4739,22 +5378,22 @@
     if (focusedCircleId && markData.circles[focusedCircleId]) {
       renderCircleMembers(focusedCircleId);
     } else if (circleMemberList) {
-      circleMemberList.textContent = '未选择圈子';
+      circleMemberList.textContent = i18n.t('text_no_circle_selected');
     }
 
     if (creatingCircle) {
       html += `
         <div class="select-item is-creating" data-creating="true">
           <span style="width:20px;text-align:center;">+</span>
-          <input type="text" class="item-input" placeholder="圈子名称" autofocus />
+          <input type="text" class="item-input" placeholder="${i18n.t('placeholder_circle_name')}" autofocus />
           <div class="item-actions">
-            <button class="icon-btn save" title="创建" data-action="create">✓</button>
-            <button class="icon-btn" title="取消" data-action="cancel-create">✕</button>
+            <button class="icon-btn save" title="${i18n.t('button_save')}" data-action="create">✓</button>
+            <button class="icon-btn" title="${i18n.t('button_cancel')}" data-action="cancel-create">✕</button>
           </div>
         </div>
       `;
     } else if (nodeId) {
-      html += '<button class="button create-new-btn" data-action="start-create">新建圈子</button>';
+      html += `<button class="button create-new-btn" data-action="start-create">${i18n.t('button_create_circle')}</button>`;
     }
 
     circleSelectList.innerHTML = html;
@@ -4806,8 +5445,8 @@
               <input type="radio" name="groupRadio" ${checked} ${disabled} />
               <input type="text" class="item-input" value="${safeText(g.name)}" data-original="${safeText(g.name)}" />
               <div class="item-actions">
-                <button class="icon-btn save" title="保存" data-action="save">✓</button>
-                <button class="icon-btn" title="取消" data-action="cancel">✕</button>
+                <button class="icon-btn save" title="${i18n.t('button_save')}" data-action="save">✓</button>
+                <button class="icon-btn" title="${i18n.t('button_cancel')}" data-action="cancel">✕</button>
               </div>
             </div>
           `;
@@ -4819,8 +5458,8 @@
             <input type="radio" name="groupRadio" ${checked} />
             <span class="item-label">${safeText(g.name)}</span>
             <div class="item-actions">
-              <button class="icon-btn" title="编辑" data-action="edit">✏️</button>
-              <button class="icon-btn delete" title="删除" data-action="delete">🗑️</button>
+              <button class="icon-btn" title="${i18n.t('button_edit')}" data-action="edit">✏️</button>
+              <button class="icon-btn delete" title="${i18n.t('button_delete')}" data-action="delete">🗑️</button>
             </div>
           </div>
         `;
@@ -4832,15 +5471,15 @@
       html += `
         <div class="select-item is-creating" data-creating="true">
           <span style="width:20px;text-align:center;">+</span>
-          <input type="text" class="item-input" placeholder="分组名称" autofocus />
+          <input type="text" class="item-input" placeholder="${i18n.t('placeholder_group_name')}" autofocus />
           <div class="item-actions">
-            <button class="icon-btn save" title="创建" data-action="create">✓</button>
-            <button class="icon-btn" title="取消" data-action="cancel-create">✕</button>
+            <button class="icon-btn save" title="${i18n.t('button_create')}" data-action="create">✓</button>
+            <button class="icon-btn" title="${i18n.t('button_cancel')}" data-action="cancel-create">✕</button>
           </div>
         </div>
       `;
     } else if (nodeId) {
-      html += '<button class="button create-new-btn" data-action="start-create" style="width:100%;margin-top:8px;">新建分组</button>';
+      html += `<button class="button create-new-btn" data-action="start-create" style="width:100%;margin-top:8px;">${i18n.t('button_create_group')}</button>`;
     }
     
     groupSelectList.innerHTML = html;
@@ -4869,8 +5508,8 @@
     if (!nodeId) {
       const groupMemberList = shadowRoot.getElementById('groupMemberList');
       const circleMemberList = shadowRoot.getElementById('circleMemberList');
-      if (groupMemberList) groupMemberList.textContent = '未选择节点';
-      if (circleMemberList) circleMemberList.textContent = '未选择节点';
+      if (groupMemberList) groupMemberList.textContent = i18n.t('text_no_node_selected');
+      if (circleMemberList) circleMemberList.textContent = i18n.t('text_no_node_selected');
       renderGroupSelect("");
       renderCircleSelect("");
       return;
@@ -4900,21 +5539,21 @@
     const detailDesc = shadowRoot.getElementById('detailDesc');
 
     if (!m) {
-      if (detailName) detailName.textContent = `未知 (#${id})`;
-      if (detailMeta) detailMeta.textContent = "无数据";
+      if (detailName) detailName.textContent = `${i18n.t('error_unknown')} (#${id})`;
+      if (detailMeta) detailMeta.textContent = i18n.t('text_no_data');
       if (detailOwnership) detailOwnership.textContent = "-";
       if (detailLovership) detailLovership.textContent = "-";
-      if (detailDesc) detailDesc.textContent = "无描述";
+      if (detailDesc) detailDesc.textContent = i18n.t('text_no_description');
     } else {
       const displayNickname = shadowRoot.getElementById('displayNickname');
-      const name = (displayNickname && displayNickname.checked && m.nickname) ? m.nickname : (m.name || '未知');
+      const name = (displayNickname && displayNickname.checked && m.nickname) ? m.nickname : (m.name || i18n.t('error_unknown'));
       
       if (detailName) detailName.textContent = `${name} (#${m.memberNumber})`;
       if (detailMeta) detailMeta.textContent = [m.title, m.nickname, m.assetFamily].filter(Boolean).join(" | ");
       
       if (detailOwnership) {
         if (m.ownership && m.ownership.MemberNumber !== undefined) {
-          detailOwnership.textContent = `${m.ownership.Name || "未知"} (#${m.ownership.MemberNumber})`;
+          detailOwnership.textContent = `${m.ownership.Name || i18n.t('error_unknown')} (#${m.ownership.MemberNumber})`;
         } else {
           detailOwnership.textContent = "-";
         }
@@ -4923,14 +5562,14 @@
       if (detailLovership) {
         if (Array.isArray(m.lovership) && m.lovership.length) {
           detailLovership.textContent = m.lovership
-            .map(l => `${l.Name || "未知"}${l.MemberNumber !== undefined ? ` (#${l.MemberNumber})` : ""}`)
+            .map(l => `${l.Name || i18n.t('error_unknown')}${l.MemberNumber !== undefined ? ` (#${l.MemberNumber})` : ""}`)
             .join(", ");
         } else {
           detailLovership.textContent = "-";
         }
       }
       
-      if (detailDesc) detailDesc.textContent = m.descriptionDecoded || "无描述";
+      if (detailDesc) detailDesc.textContent = m.descriptionDecoded || i18n.t('text_no_description');
     }
 
     if (detailEmpty) detailEmpty.style.display = "none";
@@ -4957,7 +5596,7 @@
   function updatePhysicsButton() {
     const physicsToggleBtn = shadowRoot.getElementById('physicsToggleBtn');
     if (physicsToggleBtn) {
-      physicsToggleBtn.textContent = usePhysics ? '停止物理' : '开始物理';
+      physicsToggleBtn.textContent = usePhysics ? i18n.t('button_physics_stop') : i18n.t('button_physics_start');
     }
   }
 
@@ -5091,7 +5730,11 @@
    * Main initialization function
    */
   async function main() {
-    console.log('[BC-Bio-Visualizer] v2.0.0 启动中...');
+    console.log('[BC-Bio-Visualizer]', i18n.t('log_startup'));
+
+    // Initialize i18n
+    i18n.init();
+    console.log('[BC-Bio-Visualizer] i18n initialized, language:', i18n.getLanguage());
 
     // Check required features
     if (!window.indexedDB) {
@@ -5143,7 +5786,7 @@
       console.warn('[BC-Bio-Visualizer] /biovis command unavailable, use Ctrl+Shift+V instead');
     }
 
-    console.log('[BC-Bio-Visualizer] 初始化完成！输入 /biovis 或按 Ctrl+Shift+V 打开');
+    console.log('[BC-Bio-Visualizer]', i18n.t('log_startup_complete'));
   }
 
   // Wait for page to be ready
